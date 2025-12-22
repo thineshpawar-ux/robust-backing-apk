@@ -1,12 +1,16 @@
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { LogOut } from 'lucide-react';
 
 interface HeaderProps {
   connected: boolean;
   activeView: 'team' | 'hod';
   onViewChange: (view: 'team' | 'hod') => void;
+  userEmail?: string;
+  onSignOut: () => void;
 }
 
-export function Header({ connected, activeView, onViewChange }: HeaderProps) {
+export function Header({ connected, activeView, onViewChange, userEmail, onSignOut }: HeaderProps) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-3 mb-4">
       <div className="font-semibold text-base">
@@ -17,6 +21,12 @@ export function Header({ connected, activeView, onViewChange }: HeaderProps) {
       </div>
       
       <div className="flex items-center gap-2 flex-wrap justify-end">
+        {userEmail && (
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            {userEmail}
+          </span>
+        )}
+        
         <span 
           className={cn(
             "text-xs border rounded-full px-2.5 py-1 transition-colors",
@@ -54,6 +64,16 @@ export function Header({ connected, activeView, onViewChange }: HeaderProps) {
             HOD
           </button>
         </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onSignOut}
+          className="rounded-full h-8 gap-1.5"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Sign out</span>
+        </Button>
       </div>
     </header>
   );
