@@ -28,7 +28,11 @@ export function useTasks() {
         current_target_date: t.current_target_date,
         target_date_history: t.target_date_history || [],
         completed_at: t.completed_at,
-        updated_at: t.updated_at
+        updated_at: t.updated_at,
+        date_change_pending: t.date_change_pending || false,
+        date_change_reason: t.date_change_reason,
+        date_change_requested_date: t.date_change_requested_date,
+        date_change_approved_by: t.date_change_approved_by
       }));
       
       setTasks(mappedTasks);
@@ -148,6 +152,86 @@ export function useTasks() {
     return updateTask(task.id, updates);
   };
 
+  const requestDateChange = async (taskId: string, newDate: string, reason: string) => {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({
+          date_change_pending: true,
+          date_change_requested_date: newDate,
+          date_change_reason: reason
+        })
+        .eq('id', taskId);
+
+      if (error) throw error;
+      
+      toast({
+        title: 'Date change requested',
+        description: 'Waiting for HOD approval',
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Error requesting date change:', error);
+      return { success: false, error };
+    }
+  };
+
+  const approveDateChange = async (taskId: string, approvedBy: string) => {
+    try {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task || !task.date_change_requested_date) return { success: false };
+
+      const newHistory = [...(task.target_date_history || []), task.date_change_requested_date];
+
+      const { error } = await supabase
+        .from('tasks')
+        .update({
+          current_target_date: task.date_change_requested_date,
+          target_date_history: newHistory,
+          date_change_pending: false,
+          date_change_requested_date: null,
+          date_change_reason: null,
+          date_change_approved_by: approvedBy
+        })
+        .eq('id', taskId);
+
+      if (error) throw error;
+      
+      toast({
+        title: 'Date change approved',
+        description: `New target date: ${task.date_change_requested_date}`,
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Error approving date change:', error);
+      return { success: false, error };
+    }
+  };
+
+  const rejectDateChange = async (taskId: string) => {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({
+          date_change_pending: false,
+          date_change_requested_date: null,
+          date_change_reason: null
+        })
+        .eq('id', taskId);
+
+      if (error) throw error;
+      
+      toast({
+        title: 'Date change rejected',
+        description: 'Request has been declined',
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Error rejecting date change:', error);
+      return { success: false, error };
+    }
+  };
+
   return {
     tasks,
     loading,
@@ -155,6 +239,9 @@ export function useTasks() {
     addTask,
     updateTask,
     deleteTask,
-    toggleStatus
+    toggleStatus,
+    requestDateChange,
+    approveDateChange,
+    rejectDateChange
   };
 }

@@ -1,42 +1,25 @@
 import { useMemo } from 'react';
-import { Task } from '@/types/task';
+import { Task, TEAM_MEMBERS } from '@/types/task';
 import { todayISO, isOverdue, isDueToday } from '@/lib/date-utils';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { Check, X } from 'lucide-react';
 
 interface HODDashboardProps {
   tasks: Task[];
+  onApproveChange?: (taskId: string, approvedBy: string) => Promise<{ success: boolean }>;
+  onRejectChange?: (taskId: string) => Promise<{ success: boolean }>;
 }
 
-interface KPICardProps {
-  label: string;
-  value: string | number;
-  subtitle?: string;
-  progress?: number;
-}
-
-function KPICard({ label, value, subtitle, progress }: KPICardProps) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-3">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">
-        {label}
-      </div>
-      <div className="text-xl font-semibold">{value}</div>
-      {subtitle && (
-        <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>
-      )}
-      {progress !== undefined && (
-        <div className="mt-2 h-1 rounded-full bg-muted overflow-hidden">
-          <div 
-            className="h-full rounded-full bg-primary transition-all duration-300"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-export function HODDashboard({ tasks }: HODDashboardProps) {
+export function HODDashboard({ tasks, onApproveChange, onRejectChange }: HODDashboardProps) {
   const stats = useMemo(() => {
     const total = tasks.length;
     const closed = tasks.filter(t => t.status === 'closed').length;
@@ -45,94 +28,194 @@ export function HODDashboard({ tasks }: HODDashboardProps) {
 
     const dueToday = tasks.filter(t => isDueToday(t.current_target_date, t.status)).length;
     const overdue = tasks.filter(t => isOverdue(t.current_target_date, t.status)).length;
-    const overRatio = open ? Math.round((overdue / open) * 100) : 0;
-
-    let totalMoves = 0;
-    const offender: Record<string, number> = {};
-    const slip: Record<string, number> = {};
     const td = todayISO();
 
-    tasks.forEach(t => {
-      const moves = (t.target_date_history?.length || 1) - 1;
-      if (moves > 0) {
-        totalMoves += moves;
-        offender[t.owner] = (offender[t.owner] || 0) + moves;
-      }
-      if (t.status === 'open' && t.current_target_date < td) {
-        slip[t.owner] = (slip[t.owner] || 0) + 1;
-      }
-      if (t.status === 'closed' && t.completed_at && t.completed_at > t.current_target_date) {
-        slip[t.owner] = (slip[t.owner] || 0) + 1;
-      }
-    });
+    // Per-member stats
+    const memberStats = TEAM_MEMBERS.map(member => {
+      const memberTasks = tasks.filter(t => t.owner === member);
+      const memberTotal = memberTasks.length;
+      const memberClosed = memberTasks.filter(t => t.status === 'closed').length;
+      const memberOpen = memberTasks.filter(t => t.status === 'open').length;
+      const memberOverdue = memberTasks.filter(t => isOverdue(t.current_target_date, t.status)).length;
+      const memberExec = memberTotal ? Math.round((memberClosed / memberTotal) * 100) : 0;
+      
+      // Count date changes
+      let dateChanges = 0;
+      memberTasks.forEach(t => {
+        const moves = (t.target_date_history?.length || 1) - 1;
+        dateChanges += moves;
+      });
 
-    return { total, closed, open, exec, dueToday, overdue, overRatio, totalMoves, offender, slip };
+      return {
+        name: member,
+        total: memberTotal,
+        open: memberOpen,
+        closed: memberClosed,
+        overdue: memberOverdue,
+        exec: memberExec,
+        dateChanges
+      };
+    }).filter(m => m.total > 0);
+
+    // Pending approvals
+    const pendingApprovals = tasks.filter(t => t.date_change_pending);
+
+    return { total, closed, open, exec, dueToday, overdue, memberStats, pendingApprovals };
   }, [tasks]);
 
-  const summaryItems = useMemo(() => {
-    const items: string[] = [];
-    
-    if (stats.total === 0) {
-      items.push('No work logged. HOD sees an empty board.');
-    } else {
-      items.push(`Total ${stats.total} tasks. ${stats.closed} closed, ${stats.open} open (${stats.exec}% execution).`);
-      items.push(
-        (stats.dueToday || stats.overdue) 
-          ? `${stats.dueToday} due today; ${stats.overdue} open & overdue.`
-          : 'No tasks due today, no overdue items.'
-      );
-      
-      if (stats.totalMoves > 0) {
-        const top = Object.entries(stats.offender)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 3)
-          .map(([o, c]) => `${o} ×${c}`)
-          .join(', ');
-        items.push(`Date changes: ${stats.totalMoves} moves. Heavy reschedulers: ${top}.`);
-      } else {
-        items.push('No date changes. Commitments are stable.');
-      }
-      
-      const slipTop = Object.entries(stats.slip).sort((a, b) => b[1] - a[1]);
-      if (slipTop.length) {
-        items.push('Red flag: deadline slippage by ' + slipTop.map(([o, c]) => `${o} misses ×${c}`).join(', ') + '.');
-      } else {
-        items.push('No major red flags on slippage.');
-      }
+  const handleApprove = async (taskId: string) => {
+    const approver = prompt('Enter approver name (HOD):');
+    if (approver && onApproveChange) {
+      await onApproveChange(taskId, approver);
     }
-    
-    return items;
-  }, [stats]);
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KPICard label="Total tasks" value={stats.total} />
-        <KPICard 
-          label="Execution" 
-          value={`${stats.exec}%`} 
-          subtitle="Closed / total"
-          progress={stats.exec}
-        />
-        <KPICard 
-          label="Today & overdue" 
-          value={`${stats.dueToday} / ${stats.overdue}`}
-          subtitle="Due today / overdue"
-          progress={stats.overRatio}
-        />
-        <KPICard 
-          label="Date changes" 
-          value={stats.totalMoves}
-          subtitle="Target date moves"
-        />
+    <div className="space-y-6">
+      {/* IBCS Summary Table */}
+      <div>
+        <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+          Summary
+        </h3>
+        <Table>
+          <TableBody>
+            <TableRow>
+              <TableCell className="font-medium py-2">Total tasks</TableCell>
+              <TableCell className="text-right py-2 tabular-nums">{stats.total}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium py-2">Open</TableCell>
+              <TableCell className="text-right py-2 tabular-nums">{stats.open}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium py-2">Closed</TableCell>
+              <TableCell className="text-right py-2 tabular-nums">{stats.closed}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium py-2">Execution rate</TableCell>
+              <TableCell className="text-right py-2 tabular-nums">{stats.exec}%</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium py-2">Due today</TableCell>
+              <TableCell className="text-right py-2 tabular-nums">{stats.dueToday}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell className="font-medium py-2 text-destructive">Overdue</TableCell>
+              <TableCell className="text-right py-2 tabular-nums text-destructive">{stats.overdue}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-4">
-        <ul className="space-y-1.5 text-sm text-muted-foreground list-disc list-inside">
-          {summaryItems.map((item, i) => (
-            <li key={i}>{item}</li>
-          ))}
-        </ul>
+      {/* Member Performance Table - IBCS style */}
+      <div>
+        <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+          Performance by member
+        </h3>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="py-2">Member</TableHead>
+              <TableHead className="text-right py-2">Total</TableHead>
+              <TableHead className="text-right py-2">Open</TableHead>
+              <TableHead className="text-right py-2">Closed</TableHead>
+              <TableHead className="text-right py-2">Overdue</TableHead>
+              <TableHead className="text-right py-2">Exec %</TableHead>
+              <TableHead className="text-right py-2">Date Δ</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {stats.memberStats.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
+                  No tasks assigned
+                </TableCell>
+              </TableRow>
+            ) : (
+              stats.memberStats.map(member => (
+                <TableRow key={member.name}>
+                  <TableCell className="font-medium py-2">{member.name}</TableCell>
+                  <TableCell className="text-right py-2 tabular-nums">{member.total}</TableCell>
+                  <TableCell className="text-right py-2 tabular-nums">{member.open}</TableCell>
+                  <TableCell className="text-right py-2 tabular-nums">{member.closed}</TableCell>
+                  <TableCell className={cn(
+                    "text-right py-2 tabular-nums",
+                    member.overdue > 0 && "text-destructive font-medium"
+                  )}>
+                    {member.overdue}
+                  </TableCell>
+                  <TableCell className="text-right py-2 tabular-nums">{member.exec}%</TableCell>
+                  <TableCell className={cn(
+                    "text-right py-2 tabular-nums",
+                    member.dateChanges > 2 && "text-amber-600 font-medium"
+                  )}>
+                    {member.dateChanges}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pending Date Change Approvals */}
+      <div>
+        <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+          Pending approvals ({stats.pendingApprovals.length})
+        </h3>
+        {stats.pendingApprovals.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">No pending date change requests</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="py-2">Task</TableHead>
+                <TableHead className="py-2">Owner</TableHead>
+                <TableHead className="py-2">Current</TableHead>
+                <TableHead className="py-2">Requested</TableHead>
+                <TableHead className="py-2">Reason</TableHead>
+                <TableHead className="text-right py-2">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {stats.pendingApprovals.map(task => (
+                <TableRow key={task.id}>
+                  <TableCell className="font-medium py-2 max-w-[200px] truncate">
+                    {task.title}
+                  </TableCell>
+                  <TableCell className="py-2">{task.owner}</TableCell>
+                  <TableCell className="py-2 tabular-nums">{task.current_target_date}</TableCell>
+                  <TableCell className="py-2 tabular-nums">{task.date_change_requested_date}</TableCell>
+                  <TableCell className="py-2 max-w-[200px] truncate text-muted-foreground">
+                    {task.date_change_reason}
+                  </TableCell>
+                  <TableCell className="text-right py-2">
+                    <div className="flex gap-1 justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 w-7 p-0"
+                        onClick={() => handleApprove(task.id)}
+                        title="Approve"
+                      >
+                        <Check className="h-4 w-4 text-green-600" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 w-7 p-0"
+                        onClick={() => onRejectChange?.(task.id)}
+                        title="Reject"
+                      >
+                        <X className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
     </div>
   );

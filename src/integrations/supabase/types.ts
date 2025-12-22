@@ -19,6 +19,10 @@ export type Database = {
           completed_at: string | null
           created_at: string
           current_target_date: string
+          date_change_approved_by: string | null
+          date_change_pending: boolean
+          date_change_reason: string | null
+          date_change_requested_date: string | null
           id: string
           notes: string | null
           owner: string
@@ -31,6 +35,10 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           current_target_date: string
+          date_change_approved_by?: string | null
+          date_change_pending?: boolean
+          date_change_reason?: string | null
+          date_change_requested_date?: string | null
           id?: string
           notes?: string | null
           owner: string
@@ -43,6 +51,10 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           current_target_date?: string
+          date_change_approved_by?: string | null
+          date_change_pending?: boolean
+          date_change_reason?: string | null
+          date_change_requested_date?: string | null
           id?: string
           notes?: string | null
           owner?: string

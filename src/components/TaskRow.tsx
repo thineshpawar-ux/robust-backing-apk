@@ -42,6 +42,12 @@ export function TaskRow({ task, onEdit, onToggleStatus, onDelete }: TaskRowProps
             <span className="pill">Created {task.created_at}</span>
             <span className="pill">Target {task.current_target_date}</span>
             
+            {task.date_change_pending && (
+              <span className="pill bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                Pending: {task.date_change_requested_date}
+              </span>
+            )}
+            
             {overdue && (
               <span className="pill pill-overdue">Overdue</span>
             )}

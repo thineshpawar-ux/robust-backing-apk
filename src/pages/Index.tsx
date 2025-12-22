@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<'team' | 'hod'>('team');
-  const { tasks, loading, connected, addTask, updateTask, deleteTask, toggleStatus } = useTasks();
+  const { tasks, loading, connected, addTask, updateTask, deleteTask, toggleStatus, requestDateChange, approveDateChange, rejectDateChange } = useTasks();
   const { user, signOut } = useAuth();
   const { toast } = useToast();
 
@@ -49,6 +49,7 @@ const Index = () => {
                 onUpdateTask={updateTask}
                 onDeleteTask={deleteTask}
                 onToggleStatus={toggleStatus}
+                onRequestDateChange={requestDateChange}
               />
             </div>
           ) : (
@@ -56,10 +57,14 @@ const Index = () => {
               <Card className="border-border">
                 <CardHeader className="pb-4">
                   <CardTitle className="text-base">HOD dashboard</CardTitle>
-                  <CardDescription>Short IBCS-style summary: volume, execution, slippage, behaviour.</CardDescription>
+                  <CardDescription>IBCS-style summary: volume, execution, slippage, approvals.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <HODDashboard tasks={tasks} />
+                  <HODDashboard 
+                    tasks={tasks} 
+                    onApproveChange={approveDateChange}
+                    onRejectChange={rejectDateChange}
+                  />
                 </CardContent>
               </Card>
             </div>
