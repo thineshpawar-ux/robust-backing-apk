@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 
 interface TeamViewProps {
   tasks: Task[];
+  currentUser?: string;
   onAddTask: (task: Omit<Task, 'id' | 'updated_at'>) => Promise<{ success: boolean }>;
   onUpdateTask: (id: string, updates: Partial<Task>) => Promise<{ success: boolean }>;
   onDeleteTask: (id: string) => Promise<{ success: boolean }>;
@@ -18,7 +19,8 @@ interface TeamViewProps {
 }
 
 export function TeamView({ 
-  tasks, 
+  tasks,
+  currentUser,
   onAddTask, 
   onUpdateTask, 
   onDeleteTask, 
@@ -125,6 +127,7 @@ export function TeamView({
             searchQuery={searchQuery}
             filterOwner={filterOwner}
             filterStatus={filterStatus}
+            currentUser={currentUser}
             onEdit={handleEdit}
             onToggleStatus={onToggleStatus}
             onDelete={handleDelete}

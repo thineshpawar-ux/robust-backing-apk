@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Task, TEAM_MEMBERS } from '@/types/task';
+import { Task, TEAM_MEMBERS, isHOD } from '@/types/task';
 import { todayISO, isOverdue, isDueToday } from '@/lib/date-utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { Check, X, Clock, AlertTriangle, CheckCircle2, TrendingUp, Users, Calendar, Target } from 'lucide-react';
+import { Check, X, Clock, AlertTriangle, CheckCircle2, TrendingUp, Users, Calendar, Target, ShieldAlert } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -27,15 +27,18 @@ import {
   Legend,
   Tooltip,
 } from 'recharts';
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface HODDashboardProps {
   tasks: Task[];
+  currentUserEmail?: string;
   onApproveChange?: (taskId: string, approvedBy: string) => Promise<{ success: boolean }>;
   onRejectChange?: (taskId: string) => Promise<{ success: boolean }>;
 }
 
-export function HODDashboard({ tasks, onApproveChange, onRejectChange }: HODDashboardProps) {
+export function HODDashboard({ tasks, currentUserEmail, onApproveChange, onRejectChange }: HODDashboardProps) {
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
+  const userIsHOD = isHOD(currentUserEmail);
 
   const stats = useMemo(() => {
     const total = tasks.length;
@@ -362,6 +365,12 @@ export function HODDashboard({ tasks, onApproveChange, onRejectChange }: HODDash
             <CardTitle className="text-sm font-medium uppercase tracking-wide text-[hsl(var(--chart-3))] flex items-center gap-2">
               <Clock className="h-4 w-4" />
               Pending Date Change Approvals ({stats.pendingApprovals.length})
+              {!userIsHOD && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  <ShieldAlert className="h-3 w-3 mr-1" />
+                  HOD Only
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -393,24 +402,52 @@ export function HODDashboard({ tasks, onApproveChange, onRejectChange }: HODDash
                     )}
                   </div>
                   <div className="flex gap-2 shrink-0">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-[hsl(var(--chart-2))] border-[hsl(var(--chart-2))] hover:bg-[hsl(var(--chart-2))/0.1]"
-                      onClick={() => handleApprove(task.id)}
-                    >
-                      <Check className="h-4 w-4 mr-1" />
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-destructive border-destructive hover:bg-destructive/10"
-                      onClick={() => onRejectChange?.(task.id)}
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Reject
-                    </Button>
+                    <TooltipProvider>
+                      <UITooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-[hsl(var(--chart-2))] border-[hsl(var(--chart-2))] hover:bg-[hsl(var(--chart-2))/0.1]"
+                              onClick={() => handleApprove(task.id)}
+                              disabled={!userIsHOD}
+                            >
+                              <Check className="h-4 w-4 mr-1" />
+                              Approve
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!userIsHOD && (
+                          <TooltipContent>
+                            <p>Only HOD can approve date changes</p>
+                          </TooltipContent>
+                        )}
+                      </UITooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <UITooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive border-destructive hover:bg-destructive/10"
+                              onClick={() => onRejectChange?.(task.id)}
+                              disabled={!userIsHOD}
+                            >
+                              <X className="h-4 w-4 mr-1" />
+                              Reject
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!userIsHOD && (
+                          <TooltipContent>
+                            <p>Only HOD can reject date changes</p>
+                          </TooltipContent>
+                        )}
+                      </UITooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
               ))}

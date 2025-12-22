@@ -42,5 +42,15 @@ export const TEAM_MEMBERS = [
   'Sateesh'
 ] as const;
 
+// HOD users who can approve date changes
+export const HOD_USERS = ['hod', 'admin', 'manager'] as const;
+
 export const DELETE_PASSWORD = 'SQADMIN';
 export const PAGE_SIZE = 20;
+
+// Helper to check if user is HOD
+export function isHOD(userEmail?: string): boolean {
+  if (!userEmail) return false;
+  const username = userEmail.split('@')[0].toLowerCase();
+  return HOD_USERS.some(hod => username.includes(hod));
+}

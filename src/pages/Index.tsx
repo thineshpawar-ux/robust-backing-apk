@@ -46,6 +46,7 @@ const Index = () => {
             <div className="lg:col-span-2">
               <TeamView
                 tasks={tasks}
+                currentUser={user?.email?.split('@')[0] || ''}
                 onAddTask={addTask}
                 onUpdateTask={updateTask}
                 onDeleteTask={deleteTask}
@@ -62,7 +63,8 @@ const Index = () => {
                 </CardHeader>
                 <CardContent>
                   <HODDashboard 
-                    tasks={tasks} 
+                    tasks={tasks}
+                    currentUserEmail={user?.email}
                     onApproveChange={approveDateChange}
                     onRejectChange={rejectDateChange}
                   />
