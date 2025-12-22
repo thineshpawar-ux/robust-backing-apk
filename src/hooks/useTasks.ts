@@ -22,7 +22,6 @@ export function useTasks() {
         id: t.id,
         title: t.title,
         owner: t.owner,
-        notes: t.notes,
         status: t.status as 'open' | 'closed',
         created_at: t.created_at,
         current_target_date: t.current_target_date,
@@ -86,7 +85,6 @@ export function useTasks() {
       const { error } = await supabase.from('tasks').insert({
         title: task.title,
         owner: task.owner,
-        notes: task.notes,
         status: task.status,
         created_at: task.created_at,
         current_target_date: task.current_target_date,
@@ -196,6 +194,15 @@ export function useTasks() {
         .eq('id', taskId);
 
       if (error) throw error;
+
+      // Create notification for task owner
+      await supabase.from('notifications').insert({
+        user_id: task.owner,
+        title: 'Date Change Approved',
+        message: `Your date change request for "${task.title}" has been approved. New target date: ${task.date_change_requested_date}`,
+        type: 'success',
+        task_id: taskId
+      });
       
       toast({
         title: 'Date change approved',
@@ -210,6 +217,8 @@ export function useTasks() {
 
   const rejectDateChange = async (taskId: string) => {
     try {
+      const task = tasks.find(t => t.id === taskId);
+      
       const { error } = await supabase
         .from('tasks')
         .update({
@@ -220,6 +229,17 @@ export function useTasks() {
         .eq('id', taskId);
 
       if (error) throw error;
+
+      // Create notification for task owner
+      if (task) {
+        await supabase.from('notifications').insert({
+          user_id: task.owner,
+          title: 'Date Change Rejected',
+          message: `Your date change request for "${task.title}" has been rejected.`,
+          type: 'warning',
+          task_id: taskId
+        });
+      }
       
       toast({
         title: 'Date change rejected',

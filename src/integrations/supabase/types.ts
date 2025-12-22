@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          read: boolean
+          task_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          read?: boolean
+          task_id?: string | null
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          read?: boolean
+          task_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           completed_at: string | null
@@ -24,7 +65,6 @@ export type Database = {
           date_change_reason: string | null
           date_change_requested_date: string | null
           id: string
-          notes: string | null
           owner: string
           status: string
           target_date_history: string[]
@@ -40,7 +80,6 @@ export type Database = {
           date_change_reason?: string | null
           date_change_requested_date?: string | null
           id?: string
-          notes?: string | null
           owner: string
           status?: string
           target_date_history?: string[]
@@ -56,7 +95,6 @@ export type Database = {
           date_change_reason?: string | null
           date_change_requested_date?: string | null
           id?: string
-          notes?: string | null
           owner?: string
           status?: string
           target_date_history?: string[]

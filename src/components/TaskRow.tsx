@@ -34,8 +34,8 @@ export function TaskRow({ task, onEdit, onToggleStatus, onDelete }: TaskRowProps
             </span>
           </div>
           
-          {task.notes && (
-            <p className="text-xs text-muted-foreground line-clamp-2">{task.notes}</p>
+          {task.date_change_reason && task.date_change_pending && (
+            <p className="text-xs text-muted-foreground line-clamp-2">Reason: {task.date_change_reason}</p>
           )}
           
           <div className="flex flex-wrap gap-1.5">
