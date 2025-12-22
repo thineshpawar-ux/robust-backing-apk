@@ -4,10 +4,30 @@ import { TeamView } from '@/components/TeamView';
 import { HODDashboard } from '@/components/HODDashboard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTasks } from '@/hooks/useTasks';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<'team' | 'hod'>('team');
   const { tasks, loading, connected, addTask, updateTask, deleteTask, toggleStatus } = useTasks();
+  const { user, signOut } = useAuth();
+  const { toast } = useToast();
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast({
+        title: 'Sign out failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } else {
+      toast({
+        title: 'Signed out',
+        description: 'You have been logged out successfully.'
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -16,6 +36,8 @@ const Index = () => {
           connected={connected}
           activeView={activeView}
           onViewChange={setActiveView}
+          userEmail={user?.email}
+          onSignOut={handleSignOut}
         />
 
         <main className="grid grid-cols-1 lg:grid-cols-[1.7fr_1.3fr] gap-4">
