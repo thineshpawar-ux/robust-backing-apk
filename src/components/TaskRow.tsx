@@ -1,18 +1,24 @@
-import { Task, DELETE_PASSWORD } from '@/types/task';
+import { Task, DELETE_PASSWORD, TEAM_MEMBERS } from '@/types/task';
 import { isOverdue } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface TaskRowProps {
   task: Task;
+  currentUser?: string;
   onEdit: (task: Task) => void;
   onToggleStatus: (task: Task) => void;
   onDelete: (task: Task) => void;
 }
 
-export function TaskRow({ task, onEdit, onToggleStatus, onDelete }: TaskRowProps) {
+export function TaskRow({ task, currentUser, onEdit, onToggleStatus, onDelete }: TaskRowProps) {
   const overdue = isOverdue(task.current_target_date, task.status);
   const dateChanges = (task.target_date_history?.length || 1) - 1;
+
+  // Check if current user is the task owner (can close their own tasks)
+  const isOwner = currentUser && task.owner.toLowerCase().includes(currentUser.toLowerCase());
+  const canToggleStatus = isOwner;
 
   const handleDelete = () => {
     const pwd = prompt('Enter delete password to remove this task:');
@@ -70,14 +76,28 @@ export function TaskRow({ task, onEdit, onToggleStatus, onDelete }: TaskRowProps
         </div>
         
         <div className="flex flex-wrap gap-1.5 sm:justify-end items-start">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onToggleStatus(task)}
-            className="h-7 text-xs rounded-full"
-          >
-            {task.status === 'open' ? 'Close' : 'Reopen'}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onToggleStatus(task)}
+                    disabled={!canToggleStatus}
+                    className="h-7 text-xs rounded-full"
+                  >
+                    {task.status === 'open' ? 'Close' : 'Reopen'}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {!canToggleStatus && (
+                <TooltipContent>
+                  <p>Only task owner can close/reopen</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
           <Button
             size="sm"
             variant="outline"

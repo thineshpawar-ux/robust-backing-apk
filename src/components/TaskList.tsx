@@ -10,6 +10,7 @@ interface TaskListProps {
   searchQuery: string;
   filterOwner: string;
   filterStatus: string;
+  currentUser?: string;
   onEdit: (task: Task) => void;
   onToggleStatus: (task: Task) => void;
   onDelete: (task: Task) => void;
@@ -20,6 +21,7 @@ export function TaskList({
   searchQuery,
   filterOwner,
   filterStatus,
+  currentUser,
   onEdit,
   onToggleStatus,
   onDelete
@@ -76,6 +78,7 @@ export function TaskList({
           <TaskRow
             key={task.id}
             task={task}
+            currentUser={currentUser}
             onEdit={onEdit}
             onToggleStatus={onToggleStatus}
             onDelete={onDelete}
