@@ -9,6 +9,10 @@ export interface Task {
   target_date_history: string[];
   completed_at: string | null;
   updated_at: string;
+  date_change_pending: boolean;
+  date_change_reason: string | null;
+  date_change_requested_date: string | null;
+  date_change_approved_by: string | null;
 }
 
 export type TaskFormData = {
