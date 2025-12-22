@@ -37,6 +37,7 @@ const Index = () => {
           activeView={activeView}
           onViewChange={setActiveView}
           userEmail={user?.email}
+          currentUser={user?.email?.split('@')[0] || ''}
           onSignOut={handleSignOut}
         />
 

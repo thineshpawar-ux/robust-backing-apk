@@ -50,7 +50,6 @@ export function TeamView({
       const result = await onUpdateTask(editingId, {
         title: data.title,
         owner: data.owner,
-        notes: data.notes || null,
         status: data.status,
         completed_at: data.status === 'closed' 
           ? (existing.completed_at || todayISO()) 
@@ -65,7 +64,6 @@ export function TeamView({
       await onAddTask({
         title: data.title,
         owner: data.owner,
-        notes: data.notes || null,
         status: data.status,
         created_at: today,
         current_target_date: data.current_target_date,

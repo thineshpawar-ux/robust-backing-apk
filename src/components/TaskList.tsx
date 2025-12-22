@@ -41,7 +41,7 @@ export function TaskList({
       }
       
       if (query) {
-        const haystack = `${task.title} ${task.notes || ''} ${task.owner}`.toLowerCase();
+        const haystack = `${task.title} ${task.owner}`.toLowerCase();
         if (!haystack.includes(query)) return false;
       }
       

@@ -24,7 +24,6 @@ export function TaskForm({ editingTask, onSubmit, onReset, taskCount }: TaskForm
   const [formData, setFormData] = useState<TaskFormData>({
     title: '',
     owner: '',
-    notes: '',
     status: 'open',
     current_target_date: todayISO()
   });
@@ -35,7 +34,6 @@ export function TaskForm({ editingTask, onSubmit, onReset, taskCount }: TaskForm
       setFormData({
         title: editingTask.title,
         owner: editingTask.owner,
-        notes: editingTask.notes || '',
         status: editingTask.status,
         current_target_date: editingTask.current_target_date
       });
@@ -59,7 +57,6 @@ export function TaskForm({ editingTask, onSubmit, onReset, taskCount }: TaskForm
     setFormData({
       title: '',
       owner: '',
-      notes: '',
       status: 'open',
       current_target_date: todayISO()
     });
@@ -127,16 +124,6 @@ export function TaskForm({ editingTask, onSubmit, onReset, taskCount }: TaskForm
           </Select>
         </div>
         
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="notes" className="text-xs text-muted-foreground">Notes</Label>
-          <Textarea
-            id="notes"
-            value={formData.notes}
-            onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-            className="min-h-[60px] resize-y"
-            placeholder="Add any additional notes..."
-          />
-        </div>
       </div>
       
       <div className="flex flex-wrap items-center gap-3">

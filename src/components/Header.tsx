@@ -1,16 +1,18 @@
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 
 interface HeaderProps {
   connected: boolean;
   activeView: 'team' | 'hod';
   onViewChange: (view: 'team' | 'hod') => void;
   userEmail?: string;
+  currentUser?: string;
   onSignOut: () => void;
 }
 
-export function Header({ connected, activeView, onViewChange, userEmail, onSignOut }: HeaderProps) {
+export function Header({ connected, activeView, onViewChange, userEmail, currentUser, onSignOut }: HeaderProps) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-3 mb-4">
       <div className="font-semibold text-base">
@@ -64,6 +66,10 @@ export function Header({ connected, activeView, onViewChange, userEmail, onSignO
             HOD
           </button>
         </div>
+
+        {currentUser && (
+          <NotificationBell userId={currentUser} />
+        )}
 
         <Button
           variant="outline"

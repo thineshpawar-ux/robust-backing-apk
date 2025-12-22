@@ -2,7 +2,6 @@ export interface Task {
   id: string;
   title: string;
   owner: string;
-  notes: string | null;
   status: 'open' | 'closed';
   created_at: string;
   current_target_date: string;
@@ -18,10 +17,20 @@ export interface Task {
 export type TaskFormData = {
   title: string;
   owner: string;
-  notes: string;
   status: 'open' | 'closed';
   current_target_date: string;
 };
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning';
+  read: boolean;
+  task_id: string | null;
+  created_at: string;
+}
 
 export const TEAM_MEMBERS = [
   'Thinesh',
