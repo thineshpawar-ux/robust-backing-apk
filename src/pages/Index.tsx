@@ -1,17 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { TeamView } from '@/components/TeamView';
 import { HODDashboard } from '@/components/HODDashboard';
+import { RoleManagement } from '@/components/RoleManagement';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRoles } from '@/hooks/useUserRoles';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
-  const [activeView, setActiveView] = useState<'team' | 'hod'>('team');
+  const [activeView, setActiveView] = useState<'team' | 'hod' | 'roles'>('team');
   const { tasks, loading, connected, addTask, updateTask, deleteTask, toggleStatus, requestDateChange, approveDateChange, rejectDateChange } = useTasks();
   const { user, signOut } = useAuth();
+  const { fetchCurrentUserRole, isHOD } = useUserRoles();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchCurrentUserRole(user.id);
+    }
+  }, [user?.id]);
 
   const handleSignOut = async () => {
     const { error } = await signOut();
@@ -29,6 +38,8 @@ const Index = () => {
     }
   };
 
+  const currentUserIsHOD = isHOD(user?.id);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-4 max-w-[1100px]">
@@ -39,10 +50,11 @@ const Index = () => {
           userEmail={user?.email}
           currentUser={user?.email?.split('@')[0] || ''}
           onSignOut={handleSignOut}
+          isHOD={currentUserIsHOD}
         />
 
         <main className="grid grid-cols-1 lg:grid-cols-[1.7fr_1.3fr] gap-4">
-          {activeView === 'team' ? (
+          {activeView === 'team' && (
             <div className="lg:col-span-2">
               <TeamView
                 tasks={tasks}
@@ -54,7 +66,9 @@ const Index = () => {
                 onRequestDateChange={requestDateChange}
               />
             </div>
-          ) : (
+          )}
+          
+          {activeView === 'hod' && (
             <div className="lg:col-span-2">
               <Card className="border-border">
                 <CardHeader className="pb-4">
@@ -65,11 +79,18 @@ const Index = () => {
                   <HODDashboard 
                     tasks={tasks}
                     currentUserEmail={user?.email}
+                    currentUserId={user?.id}
                     onApproveChange={approveDateChange}
                     onRejectChange={rejectDateChange}
                   />
                 </CardContent>
               </Card>
+            </div>
+          )}
+
+          {activeView === 'roles' && (
+            <div className="lg:col-span-2">
+              <RoleManagement currentUserId={user?.id} />
             </div>
           )}
         </main>
