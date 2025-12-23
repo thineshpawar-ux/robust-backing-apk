@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Task, TEAM_MEMBERS, isHOD } from '@/types/task';
+import { Task, TEAM_MEMBERS } from '@/types/task';
 import { todayISO, isOverdue, isDueToday } from '@/lib/date-utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,17 +28,20 @@ import {
   Tooltip,
 } from 'recharts';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useUserRoles } from '@/hooks/useUserRoles';
 
 interface HODDashboardProps {
   tasks: Task[];
   currentUserEmail?: string;
+  currentUserId?: string;
   onApproveChange?: (taskId: string, approvedBy: string) => Promise<{ success: boolean }>;
   onRejectChange?: (taskId: string) => Promise<{ success: boolean }>;
 }
 
-export function HODDashboard({ tasks, currentUserEmail, onApproveChange, onRejectChange }: HODDashboardProps) {
+export function HODDashboard({ tasks, currentUserEmail, currentUserId, onApproveChange, onRejectChange }: HODDashboardProps) {
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
-  const userIsHOD = isHOD(currentUserEmail);
+  const { isHOD } = useUserRoles();
+  const userIsHOD = isHOD(currentUserId);
 
   const stats = useMemo(() => {
     const total = tasks.length;
