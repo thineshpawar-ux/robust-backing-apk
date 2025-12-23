@@ -31,7 +31,11 @@ export function useTasks() {
         date_change_pending: t.date_change_pending || false,
         date_change_reason: t.date_change_reason,
         date_change_requested_date: t.date_change_requested_date,
-        date_change_approved_by: t.date_change_approved_by
+        date_change_approved_by: t.date_change_approved_by,
+        closure_pending: (t as any).closure_pending || false,
+        closure_comment: (t as any).closure_comment,
+        closure_requested_by: (t as any).closure_requested_by,
+        closure_approved_by: (t as any).closure_approved_by
       }));
       
       setTasks(mappedTasks);
@@ -58,15 +62,31 @@ export function useTasks() {
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            const newTask = payload.new as Task;
-            setTasks(prev => [newTask, ...prev]);
+            const newTask = payload.new as any;
+            const mappedTask: Task = {
+              ...newTask,
+              status: newTask.status as 'open' | 'closed',
+              closure_pending: newTask.closure_pending || false,
+              closure_comment: newTask.closure_comment,
+              closure_requested_by: newTask.closure_requested_by,
+              closure_approved_by: newTask.closure_approved_by
+            };
+            setTasks(prev => [mappedTask, ...prev]);
             toast({
               title: 'New task',
-              description: `Task created for ${newTask.owner}`,
+              description: `Task created for ${mappedTask.owner}`,
             });
           } else if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as Task;
-            setTasks(prev => prev.map(t => t.id === updated.id ? updated : t));
+            const updated = payload.new as any;
+            const mappedTask: Task = {
+              ...updated,
+              status: updated.status as 'open' | 'closed',
+              closure_pending: updated.closure_pending || false,
+              closure_comment: updated.closure_comment,
+              closure_requested_by: updated.closure_requested_by,
+              closure_approved_by: updated.closure_approved_by
+            };
+            setTasks(prev => prev.map(t => t.id === mappedTask.id ? mappedTask : t));
           } else if (payload.eventType === 'DELETE') {
             const deleted = payload.old as { id: string };
             setTasks(prev => prev.filter(t => t.id !== deleted.id));
@@ -89,7 +109,11 @@ export function useTasks() {
         created_at: task.created_at,
         current_target_date: task.current_target_date,
         target_date_history: task.target_date_history,
-        completed_at: task.completed_at
+        completed_at: task.completed_at,
+        closure_pending: task.closure_pending,
+        closure_comment: task.closure_comment,
+        closure_requested_by: task.closure_requested_by,
+        closure_approved_by: task.closure_approved_by
       });
 
       if (error) throw error;
@@ -140,16 +164,6 @@ export function useTasks() {
     }
   };
 
-  const toggleStatus = async (task: Task) => {
-    const newStatus = task.status === 'open' ? 'closed' : 'open';
-    const updates: Partial<Task> = {
-      status: newStatus,
-      completed_at: newStatus === 'closed' ? new Date().toISOString().split('T')[0] : null
-    };
-    
-    return updateTask(task.id, updates);
-  };
-
   const requestDateChange = async (taskId: string, newDate: string, reason: string) => {
     try {
       const { error } = await supabase
@@ -170,6 +184,104 @@ export function useTasks() {
       return { success: true };
     } catch (error) {
       console.error('Error requesting date change:', error);
+      return { success: false, error };
+    }
+  };
+
+  const requestClosure = async (taskId: string, comment: string, requestedBy: string) => {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({
+          closure_pending: true,
+          closure_comment: comment,
+          closure_requested_by: requestedBy
+        })
+        .eq('id', taskId);
+
+      if (error) throw error;
+      
+      toast({
+        title: 'Closure requested',
+        description: 'Waiting for HOD approval',
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Error requesting closure:', error);
+      return { success: false, error };
+    }
+  };
+
+  const approveClosure = async (taskId: string, approvedBy: string) => {
+    try {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return { success: false };
+
+      const { error } = await supabase
+        .from('tasks')
+        .update({
+          status: 'closed',
+          completed_at: new Date().toISOString().split('T')[0],
+          closure_pending: false,
+          closure_approved_by: approvedBy
+        })
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      // Create notification for task owner
+      await supabase.from('notifications').insert({
+        user_id: task.owner,
+        title: 'Task Closure Approved',
+        message: `Your closure request for "${task.title}" has been approved.`,
+        type: 'success',
+        task_id: taskId
+      });
+      
+      toast({
+        title: 'Closure approved',
+        description: 'Task has been closed',
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Error approving closure:', error);
+      return { success: false, error };
+    }
+  };
+
+  const rejectClosure = async (taskId: string) => {
+    try {
+      const task = tasks.find(t => t.id === taskId);
+      
+      const { error } = await supabase
+        .from('tasks')
+        .update({
+          closure_pending: false,
+          closure_comment: null,
+          closure_requested_by: null
+        })
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      // Create notification for task owner
+      if (task) {
+        await supabase.from('notifications').insert({
+          user_id: task.owner,
+          title: 'Task Closure Rejected',
+          message: `Your closure request for "${task.title}" has been rejected.`,
+          type: 'warning',
+          task_id: taskId
+        });
+      }
+      
+      toast({
+        title: 'Closure rejected',
+        description: 'Request has been declined',
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Error rejecting closure:', error);
       return { success: false, error };
     }
   };
@@ -259,8 +371,10 @@ export function useTasks() {
     addTask,
     updateTask,
     deleteTask,
-    toggleStatus,
     requestDateChange,
+    requestClosure,
+    approveClosure,
+    rejectClosure,
     approveDateChange,
     rejectDateChange
   };

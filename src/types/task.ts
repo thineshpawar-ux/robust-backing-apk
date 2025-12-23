@@ -12,6 +12,11 @@ export interface Task {
   date_change_reason: string | null;
   date_change_requested_date: string | null;
   date_change_approved_by: string | null;
+  // Closure workflow fields
+  closure_pending: boolean;
+  closure_comment: string | null;
+  closure_requested_by: string | null;
+  closure_approved_by: string | null;
 }
 
 export type TaskFormData = {

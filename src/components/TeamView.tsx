@@ -4,6 +4,7 @@ import { TaskForm } from './TaskForm';
 import { TaskFilters } from './TaskFilters';
 import { TaskList } from './TaskList';
 import { DateChangeDialog } from './DateChangeDialog';
+import { ClosureRequestDialog } from './ClosureRequestDialog';
 import { Task, TaskFormData } from '@/types/task';
 import { todayISO } from '@/lib/date-utils';
 import { useToast } from '@/hooks/use-toast';
@@ -14,8 +15,8 @@ interface TeamViewProps {
   onAddTask: (task: Omit<Task, 'id' | 'updated_at'>) => Promise<{ success: boolean }>;
   onUpdateTask: (id: string, updates: Partial<Task>) => Promise<{ success: boolean }>;
   onDeleteTask: (id: string) => Promise<{ success: boolean }>;
-  onToggleStatus: (task: Task) => Promise<{ success: boolean }>;
   onRequestDateChange: (taskId: string, newDate: string, reason: string) => Promise<{ success: boolean }>;
+  onRequestClosure: (taskId: string, comment: string, requestedBy: string) => Promise<{ success: boolean }>;
 }
 
 export function TeamView({ 
@@ -24,14 +25,14 @@ export function TeamView({
   onAddTask, 
   onUpdateTask, 
   onDeleteTask, 
-  onToggleStatus,
-  onRequestDateChange 
+  onRequestDateChange,
+  onRequestClosure
 }: TeamViewProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [filterOwner, setFilterOwner] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [dateChangeTask, setDateChangeTask] = useState<Task | null>(null);
+  const [closureTask, setClosureTask] = useState<Task | null>(null);
   const { toast } = useToast();
 
   const handleSubmit = async (data: TaskFormData, editingId: string | null) => {
@@ -52,10 +53,6 @@ export function TeamView({
       const result = await onUpdateTask(editingId, {
         title: data.title,
         owner: data.owner,
-        status: data.status,
-        completed_at: data.status === 'closed' 
-          ? (existing.completed_at || todayISO()) 
-          : null
       });
 
       if (result.success) {
@@ -74,7 +71,11 @@ export function TeamView({
         date_change_pending: false,
         date_change_reason: null,
         date_change_requested_date: null,
-        date_change_approved_by: null
+        date_change_approved_by: null,
+        closure_pending: false,
+        closure_comment: null,
+        closure_requested_by: null,
+        closure_approved_by: null
       });
     }
   };
@@ -89,6 +90,15 @@ export function TeamView({
     }
   };
 
+  const handleClosureSubmit = async (comment: string) => {
+    if (!closureTask || !currentUser) return;
+    
+    const result = await onRequestClosure(closureTask.id, comment, currentUser);
+    if (result.success) {
+      setClosureTask(null);
+    }
+  };
+
   const handleEdit = (task: Task) => {
     setEditingTask(task);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -98,17 +108,19 @@ export function TeamView({
     await onDeleteTask(task.id);
   };
 
+  const handleRequestClosure = (task: Task) => {
+    setClosureTask(task);
+  };
+
   return (
     <>
       <Card className="border-border">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base">Team tasks</CardTitle>
+          <CardTitle className="text-base">Team Tasks</CardTitle>
           <CardDescription>Single list for all supplier quality work.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <TaskFilters
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
             filterOwner={filterOwner}
             onOwnerChange={setFilterOwner}
             filterStatus={filterStatus}
@@ -124,12 +136,11 @@ export function TeamView({
           
           <TaskList
             tasks={tasks}
-            searchQuery={searchQuery}
             filterOwner={filterOwner}
             filterStatus={filterStatus}
             currentUser={currentUser}
             onEdit={handleEdit}
-            onToggleStatus={onToggleStatus}
+            onRequestClosure={handleRequestClosure}
             onDelete={handleDelete}
           />
         </CardContent>
@@ -140,6 +151,13 @@ export function TeamView({
         onOpenChange={(open) => !open && setDateChangeTask(null)}
         currentDate={dateChangeTask?.current_target_date || todayISO()}
         onSubmit={handleDateChangeSubmit}
+      />
+
+      <ClosureRequestDialog
+        open={!!closureTask}
+        onOpenChange={(open) => !open && setClosureTask(null)}
+        taskTitle={closureTask?.title || ''}
+        onSubmit={handleClosureSubmit}
       />
     </>
   );

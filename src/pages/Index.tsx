@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<'team' | 'hod' | 'roles'>('team');
-  const { tasks, loading, connected, addTask, updateTask, deleteTask, toggleStatus, requestDateChange, approveDateChange, rejectDateChange } = useTasks();
+  const { tasks, loading, connected, addTask, updateTask, deleteTask, requestDateChange, requestClosure, approveClosure, rejectClosure, approveDateChange, rejectDateChange } = useTasks();
   const { user, signOut } = useAuth();
   const { fetchCurrentUserRole, isHOD } = useUserRoles();
   const { toast } = useToast();
@@ -62,8 +62,8 @@ const Index = () => {
                 onAddTask={addTask}
                 onUpdateTask={updateTask}
                 onDeleteTask={deleteTask}
-                onToggleStatus={toggleStatus}
                 onRequestDateChange={requestDateChange}
+                onRequestClosure={requestClosure}
               />
             </div>
           )}
@@ -72,7 +72,7 @@ const Index = () => {
             <div className="lg:col-span-2">
               <Card className="border-border">
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-base">HOD dashboard</CardTitle>
+                  <CardTitle className="text-base">HOD Dashboard</CardTitle>
                   <CardDescription>IBCS-style summary: volume, execution, slippage, approvals.</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -80,8 +80,10 @@ const Index = () => {
                     tasks={tasks}
                     currentUserEmail={user?.email}
                     currentUserId={user?.id}
-                    onApproveChange={approveDateChange}
-                    onRejectChange={rejectDateChange}
+                    onApproveDateChange={approveDateChange}
+                    onRejectDateChange={rejectDateChange}
+                    onApproveClosure={approveClosure}
+                    onRejectClosure={rejectClosure}
                   />
                 </CardContent>
               </Card>

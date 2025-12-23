@@ -1,24 +1,25 @@
-import { Task, DELETE_PASSWORD, TEAM_MEMBERS } from '@/types/task';
+import { Task, DELETE_PASSWORD } from '@/types/task';
 import { isOverdue } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Clock, CheckCircle2, AlertTriangle, Hourglass } from 'lucide-react';
 
 interface TaskRowProps {
   task: Task;
   currentUser?: string;
   onEdit: (task: Task) => void;
-  onToggleStatus: (task: Task) => void;
+  onRequestClosure: (task: Task) => void;
   onDelete: (task: Task) => void;
 }
 
-export function TaskRow({ task, currentUser, onEdit, onToggleStatus, onDelete }: TaskRowProps) {
+export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete }: TaskRowProps) {
   const overdue = isOverdue(task.current_target_date, task.status);
   const dateChanges = (task.target_date_history?.length || 1) - 1;
 
-  // Check if current user is the task owner (can close their own tasks)
+  // Check if current user is the task owner
   const isOwner = currentUser && task.owner.toLowerCase().includes(currentUser.toLowerCase());
-  const canToggleStatus = isOwner;
+  const canRequestClosure = isOwner && task.status === 'open' && !task.closure_pending;
 
   const handleDelete = () => {
     const pwd = prompt('Enter delete password to remove this task:');
@@ -29,24 +30,55 @@ export function TaskRow({ task, currentUser, onEdit, onToggleStatus, onDelete }:
     onDelete(task);
   };
 
+  const getStatusIcon = () => {
+    if (task.closure_pending) return <Hourglass className="h-4 w-4 text-[hsl(var(--chart-3))]" />;
+    if (task.status === 'closed') return <CheckCircle2 className="h-4 w-4 text-[hsl(var(--chart-2))]" />;
+    if (overdue) return <AlertTriangle className="h-4 w-4 text-destructive" />;
+    return <Clock className="h-4 w-4 text-[hsl(var(--chart-1))]" />;
+  };
+
   return (
-    <div className="rounded-lg border border-border bg-card p-3 mb-2 animate-fade-in hover:shadow-sm transition-shadow">
-      <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-2">
-        <div className="space-y-2">
+    <div className={cn(
+      "rounded-lg border bg-card p-4 mb-3 animate-fade-in transition-all hover:shadow-md",
+      task.closure_pending && "border-[hsl(var(--chart-3))] bg-[hsl(var(--chart-3))/0.03]",
+      overdue && !task.closure_pending && "border-destructive/50 bg-destructive/5"
+    )}>
+      <div className="flex items-start gap-4">
+        {/* Status Icon */}
+        <div className="flex-shrink-0 mt-1">
+          {getStatusIcon()}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-baseline justify-between gap-2 flex-wrap">
-            <span className="font-medium text-sm">{task.title}</span>
-            <span className="text-xs px-2.5 py-0.5 rounded-full border border-border bg-muted text-muted-foreground">
+            <span className="font-medium text-sm text-foreground">{task.title}</span>
+            <span className="text-xs px-2.5 py-1 rounded-full border border-border bg-muted text-muted-foreground font-medium">
               {task.owner}
             </span>
           </div>
           
+          {/* Closure Comment if pending */}
+          {task.closure_pending && task.closure_comment && (
+            <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded italic">
+              Closure comment: "{task.closure_comment}"
+            </div>
+          )}
+
+          {/* Date Change Reason if pending */}
           {task.date_change_reason && task.date_change_pending && (
-            <p className="text-xs text-muted-foreground line-clamp-2">Reason: {task.date_change_reason}</p>
+            <p className="text-xs text-muted-foreground">Reason: {task.date_change_reason}</p>
           )}
           
           <div className="flex flex-wrap gap-1.5">
             <span className="pill">Created {task.created_at}</span>
             <span className="pill">Target {task.current_target_date}</span>
+            
+            {task.closure_pending && (
+              <span className="pill bg-[hsl(var(--chart-3))/0.15] text-[hsl(var(--chart-3))] border-[hsl(var(--chart-3))/0.3]">
+                Pending Closure
+              </span>
+            )}
             
             {task.date_change_pending && (
               <span className="pill bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
@@ -54,7 +86,7 @@ export function TaskRow({ task, currentUser, onEdit, onToggleStatus, onDelete }:
               </span>
             )}
             
-            {overdue && (
+            {overdue && !task.closure_pending && (
               <span className="pill pill-overdue">Overdue</span>
             )}
             
@@ -66,38 +98,50 @@ export function TaskRow({ task, currentUser, onEdit, onToggleStatus, onDelete }:
               <span className="pill">Closed {task.completed_at}</span>
             )}
             
-            <span className={cn(
-              "pill",
-              task.status === 'open' ? "pill-open" : "pill-closed"
-            )}>
-              {task.status === 'open' ? 'Open' : 'Closed'}
-            </span>
+            {!task.closure_pending && (
+              <span className={cn(
+                "pill",
+                task.status === 'open' ? "pill-open" : "pill-closed"
+              )}>
+                {task.status === 'open' ? 'Open' : 'Closed'}
+              </span>
+            )}
           </div>
         </div>
         
-        <div className="flex flex-wrap gap-1.5 sm:justify-end items-start">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onToggleStatus(task)}
-                    disabled={!canToggleStatus}
-                    className="h-7 text-xs rounded-full"
-                  >
-                    {task.status === 'open' ? 'Close' : 'Reopen'}
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              {!canToggleStatus && (
-                <TooltipContent>
-                  <p>Only task owner can close/reopen</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          </TooltipProvider>
+        {/* Actions */}
+        <div className="flex flex-col gap-1.5 flex-shrink-0">
+          {task.status === 'open' && !task.closure_pending && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => onRequestClosure(task)}
+                      disabled={!canRequestClosure}
+                      className="h-7 text-xs rounded-full w-full"
+                    >
+                      Close
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!canRequestClosure && (
+                  <TooltipContent>
+                    <p>Only task owner can request closure</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          
+          {task.closure_pending && (
+            <span className="text-xs text-[hsl(var(--chart-3))] font-medium text-center">
+              Awaiting HOD
+            </span>
+          )}
+          
           <Button
             size="sm"
             variant="outline"
