@@ -57,6 +57,10 @@ export type Database = {
       }
       tasks: {
         Row: {
+          closure_approved_by: string | null
+          closure_comment: string | null
+          closure_pending: boolean
+          closure_requested_by: string | null
           completed_at: string | null
           created_at: string
           current_target_date: string
@@ -72,6 +76,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          closure_approved_by?: string | null
+          closure_comment?: string | null
+          closure_pending?: boolean
+          closure_requested_by?: string | null
           completed_at?: string | null
           created_at?: string
           current_target_date: string
@@ -87,6 +95,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          closure_approved_by?: string | null
+          closure_comment?: string | null
+          closure_pending?: boolean
+          closure_requested_by?: string | null
           completed_at?: string | null
           created_at?: string
           current_target_date?: string

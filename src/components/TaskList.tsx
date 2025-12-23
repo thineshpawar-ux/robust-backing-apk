@@ -7,49 +7,42 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface TaskListProps {
   tasks: Task[];
-  searchQuery: string;
   filterOwner: string;
   filterStatus: string;
   currentUser?: string;
   onEdit: (task: Task) => void;
-  onToggleStatus: (task: Task) => void;
+  onRequestClosure: (task: Task) => void;
   onDelete: (task: Task) => void;
 }
 
 export function TaskList({
   tasks,
-  searchQuery,
   filterOwner,
   filterStatus,
   currentUser,
   onEdit,
-  onToggleStatus,
+  onRequestClosure,
   onDelete
 }: TaskListProps) {
   const [page, setPage] = useState(1);
 
   const filteredTasks = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-    
     return tasks.filter(task => {
       if (filterOwner && filterOwner !== 'all' && task.owner !== filterOwner) return false;
       
       if (filterStatus && filterStatus !== 'all') {
         if (filterStatus === 'overdue') {
           if (!isOverdue(task.current_target_date, task.status)) return false;
+        } else if (filterStatus === 'pending_closure') {
+          if (!task.closure_pending) return false;
         } else if (task.status !== filterStatus) {
           return false;
         }
       }
       
-      if (query) {
-        const haystack = `${task.title} ${task.owner}`.toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      
       return true;
     });
-  }, [tasks, searchQuery, filterOwner, filterStatus]);
+  }, [tasks, filterOwner, filterStatus]);
 
   const totalPages = Math.max(1, Math.ceil(filteredTasks.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -73,14 +66,14 @@ export function TaskList({
 
   return (
     <div className="space-y-3">
-      <div className="max-h-[360px] overflow-y-auto pr-1 space-y-0">
+      <div className="max-h-[400px] overflow-y-auto pr-1 space-y-0">
         {pageItems.map(task => (
           <TaskRow
             key={task.id}
             task={task}
             currentUser={currentUser}
             onEdit={onEdit}
-            onToggleStatus={onToggleStatus}
+            onRequestClosure={onRequestClosure}
             onDelete={onDelete}
           />
         ))}
