@@ -49,8 +49,21 @@ export function useAuth() {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    return { error };
+    try {
+      const { error } = await supabase.auth.signOut();
+      // Even if signOut fails (e.g., session already expired), clear local state
+      if (error) {
+        console.warn('Sign out warning:', error.message);
+      }
+      setSession(null);
+      setUser(null);
+      return { error: null };
+    } catch (err) {
+      // Force clear state on any error
+      setSession(null);
+      setUser(null);
+      return { error: null };
+    }
   };
 
   return {
