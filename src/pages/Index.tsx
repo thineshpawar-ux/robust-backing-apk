@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { TeamView } from '@/components/TeamView';
 import { HODDashboard } from '@/components/HODDashboard';
@@ -11,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { todayISO } from '@/lib/date-utils';
 
 const Index = () => {
+  const navigate = useNavigate();
   const [activeView, setActiveView] = useState<'team' | 'hod'>('team');
   const { tasks, loading, connected, addTask, updateTask, deleteTask, requestDateChange, requestClosure, approveClosure, rejectClosure, approveDateChange, rejectDateChange } = useTasks();
   const { user, signOut } = useAuth();
@@ -24,19 +26,12 @@ const Index = () => {
   }, [user?.id]);
 
   const handleSignOut = async () => {
-    const { error } = await signOut();
-    if (error) {
-      toast({
-        title: 'Sign out failed',
-        description: error.message,
-        variant: 'destructive'
-      });
-    } else {
-      toast({
-        title: 'Signed out',
-        description: 'You have been logged out successfully.'
-      });
-    }
+    await signOut();
+    toast({
+      title: 'Signed out',
+      description: 'You have been logged out successfully.'
+    });
+    navigate('/auth', { replace: true });
   };
 
   const handleAddSubtask = async (parentTaskId: string, title: string, owner: string, targetDate: string) => {
