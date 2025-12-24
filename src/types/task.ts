@@ -17,6 +17,8 @@ export interface Task {
   closure_comment: string | null;
   closure_requested_by: string | null;
   closure_approved_by: string | null;
+  // Subtask support
+  parent_task_id: string | null;
 }
 
 export type TaskFormData = {

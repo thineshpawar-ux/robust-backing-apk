@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Check, X, Clock, AlertTriangle, CheckCircle2, TrendingUp, Users, Calendar, Target, ShieldAlert, FileCheck } from 'lucide-react';
+import { Check, X, Clock, AlertTriangle, CheckCircle2, TrendingUp, Users, Calendar, Target, ShieldAlert, FileCheck, Plus } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -21,6 +21,7 @@ import {
 } from 'recharts';
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUserRoles } from '@/hooks/useUserRoles';
+import { SubtaskDialog } from './SubtaskDialog';
 
 interface HODDashboardProps {
   tasks: Task[];
@@ -30,10 +31,21 @@ interface HODDashboardProps {
   onRejectDateChange?: (taskId: string) => Promise<{ success: boolean }>;
   onApproveClosure?: (taskId: string, approvedBy: string) => Promise<{ success: boolean }>;
   onRejectClosure?: (taskId: string) => Promise<{ success: boolean }>;
+  onAddSubtask?: (parentTaskId: string, title: string, owner: string, targetDate: string) => Promise<{ success: boolean }>;
 }
 
-export function HODDashboard({ tasks, currentUserEmail, currentUserId, onApproveDateChange, onRejectDateChange, onApproveClosure, onRejectClosure }: HODDashboardProps) {
+export function HODDashboard({ 
+  tasks, 
+  currentUserEmail, 
+  currentUserId, 
+  onApproveDateChange, 
+  onRejectDateChange, 
+  onApproveClosure, 
+  onRejectClosure,
+  onAddSubtask 
+}: HODDashboardProps) {
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
+  const [subtaskParentTask, setSubtaskParentTask] = useState<Task | null>(null);
   const { isHOD } = useUserRoles();
   const userIsHOD = isHOD(currentUserId);
 
@@ -91,6 +103,13 @@ export function HODDashboard({ tasks, currentUserEmail, currentUserId, onApprove
   const handleApproveClosure = async (taskId: string) => {
     if (currentUserEmail && onApproveClosure) {
       await onApproveClosure(taskId, currentUserEmail.split('@')[0]);
+    }
+  };
+
+  const handleAddSubtask = async (title: string, owner: string, targetDate: string) => {
+    if (subtaskParentTask && onAddSubtask) {
+      await onAddSubtask(subtaskParentTask.id, title, owner, targetDate);
+      setSubtaskParentTask(null);
     }
   };
 
@@ -419,6 +438,26 @@ export function HODDashboard({ tasks, currentUserEmail, currentUserId, onApprove
                     )}
                   </div>
                   <div className="flex gap-2 shrink-0">
+                    {userIsHOD && (
+                      <TooltipProvider>
+                        <UITooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-primary border-primary hover:bg-primary/10"
+                              onClick={() => setSubtaskParentTask(task)}
+                            >
+                              <Plus className="h-4 w-4 mr-1" />
+                              Add Subtask
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Add a subtask instead of closing</p>
+                          </TooltipContent>
+                        </UITooltip>
+                      </TooltipProvider>
+                    )}
                     <TooltipProvider>
                       <UITooltip>
                         <TooltipTrigger asChild>
@@ -570,6 +609,14 @@ export function HODDashboard({ tasks, currentUserEmail, currentUserId, onApprove
           </CardContent>
         </Card>
       )}
+
+      {/* Subtask Dialog */}
+      <SubtaskDialog
+        open={!!subtaskParentTask}
+        onOpenChange={(open) => !open && setSubtaskParentTask(null)}
+        parentTaskTitle={subtaskParentTask?.title || ''}
+        onSubmit={handleAddSubtask}
+      />
     </div>
   );
 }

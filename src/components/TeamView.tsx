@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TaskForm } from './TaskForm';
-import { TaskFilters } from './TaskFilters';
 import { TaskList } from './TaskList';
 import { DateChangeDialog } from './DateChangeDialog';
 import { ClosureRequestDialog } from './ClosureRequestDialog';
@@ -29,8 +28,6 @@ export function TeamView({
   onRequestClosure
 }: TeamViewProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [filterOwner, setFilterOwner] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
   const [dateChangeTask, setDateChangeTask] = useState<Task | null>(null);
   const [closureTask, setClosureTask] = useState<Task | null>(null);
   const { toast } = useToast();
@@ -75,7 +72,8 @@ export function TeamView({
         closure_pending: false,
         closure_comment: null,
         closure_requested_by: null,
-        closure_approved_by: null
+        closure_approved_by: null,
+        parent_task_id: null
       });
     }
   };
@@ -120,13 +118,6 @@ export function TeamView({
           <CardDescription>Single list for all supplier quality work.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <TaskFilters
-            filterOwner={filterOwner}
-            onOwnerChange={setFilterOwner}
-            filterStatus={filterStatus}
-            onStatusChange={setFilterStatus}
-          />
-          
           <TaskForm
             editingTask={editingTask}
             onSubmit={handleSubmit}
@@ -136,8 +127,6 @@ export function TeamView({
           
           <TaskList
             tasks={tasks}
-            filterOwner={filterOwner}
-            filterStatus={filterStatus}
             currentUser={currentUser}
             onEdit={handleEdit}
             onRequestClosure={handleRequestClosure}
