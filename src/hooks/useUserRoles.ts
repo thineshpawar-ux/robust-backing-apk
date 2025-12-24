@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export type AppRole = 'hod' | 'team_member';
@@ -13,28 +12,43 @@ export interface UserRole {
   updated_at: string;
 }
 
+const USERS_KEY = 'sqtodo_users';
+
+interface LocalUser {
+  id: string;
+  email: string;
+  name: string;
+  role: AppRole;
+  securityAnswer?: string;
+}
+
+function getStoredUsers(): LocalUser[] {
+  const stored = localStorage.getItem(USERS_KEY);
+  return stored ? JSON.parse(stored) : [];
+}
+
+function saveUsers(users: LocalUser[]) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
 export function useUserRoles() {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchUserRoles = async () => {
+  const fetchUserRoles = () => {
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('*')
-        .order('user_email');
-
-      if (error) throw error;
-      
-      // Cast the role field to AppRole type
-      const typedData = (data || []).map(row => ({
-        ...row,
-        role: row.role as AppRole
+      const users = getStoredUsers();
+      const roles: UserRole[] = users.map(u => ({
+        id: u.id,
+        user_id: u.id,
+        user_email: u.email,
+        role: u.role,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }));
-      
-      setUserRoles(typedData);
+      setUserRoles(roles);
     } catch (error: any) {
       console.error('Error fetching user roles:', error);
     } finally {
@@ -42,17 +56,15 @@ export function useUserRoles() {
     }
   };
 
-  const fetchCurrentUserRole = async (userId: string) => {
+  const fetchCurrentUserRole = (userId: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .rpc('get_user_role', { _user_id: userId });
-
-      if (error) throw error;
-      setCurrentUserRole(data as AppRole);
+      const users = getStoredUsers();
+      const user = users.find(u => u.id === userId);
+      setCurrentUserRole(user?.role || 'team_member');
     } catch (error: any) {
       console.error('Error fetching current user role:', error);
-      setCurrentUserRole('team_member'); // Default to team_member if error
+      setCurrentUserRole('team_member');
     } finally {
       setLoading(false);
     }
@@ -60,19 +72,18 @@ export function useUserRoles() {
 
   const updateUserRole = async (userId: string, newRole: AppRole) => {
     try {
-      const { error } = await supabase
-        .from('user_roles')
-        .update({ role: newRole })
-        .eq('user_id', userId);
-
-      if (error) throw error;
+      const users = getStoredUsers();
+      const updatedUsers = users.map(u => 
+        u.id === userId ? { ...u, role: newRole } : u
+      );
+      saveUsers(updatedUsers);
 
       toast({
         title: 'Role Updated',
         description: 'User role has been updated successfully.',
       });
 
-      await fetchUserRoles();
+      fetchUserRoles();
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -83,18 +94,26 @@ export function useUserRoles() {
   };
 
   const isHOD = (userId?: string, userEmail?: string): boolean => {
-    // Check currentUserRole first (from database function)
     if (currentUserRole === 'hod') {
       return true;
     }
-    // Fallback: check by role in userRoles array
     if (!userId) return false;
-    const userRole = userRoles.find(r => r.user_id === userId);
-    return userRole?.role === 'hod';
+    const users = getStoredUsers();
+    const user = users.find(u => u.id === userId);
+    return user?.role === 'hod';
   };
 
   useEffect(() => {
     fetchUserRoles();
+    
+    // Listen for storage events
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === USERS_KEY) {
+        fetchUserRoles();
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   return {

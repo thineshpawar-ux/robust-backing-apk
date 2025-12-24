@@ -44,7 +44,7 @@ import { Shield, User, Crown, Users, UserPlus, Trash2, Edit, Settings, UserCheck
 import { useUserRoles, AppRole, UserRole } from '@/hooks/useUserRoles';
 import { useTeamMembers, TeamMember } from '@/hooks/useTeamMembers';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+
 
 interface HODAdminPanelProps {
   currentUserId?: string;
