@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Task } from '@/types/task';
-import { todayISO, isOverdue, isDueToday, formatDate } from '@/lib/date-utils';
+import { isOverdue, isDueToday, formatDate } from '@/lib/date-utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { 
   Clock, AlertTriangle, CheckCircle2, TrendingUp, Target, 
-  FileCheck, ListTodo, Ban, Calendar, MessageSquareWarning
+  FileCheck, ListTodo, Ban, Calendar, MessageSquareWarning, Send, CalendarClock
 } from 'lucide-react';
 import {
   BarChart,
@@ -28,6 +29,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ClosureRequestDialog } from './ClosureRequestDialog';
+import { DateChangeDialog } from './DateChangeDialog';
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface TeamMemberDashboardProps {
   tasks: Task[];
@@ -38,8 +42,13 @@ interface TeamMemberDashboardProps {
 
 export function TeamMemberDashboard({ 
   tasks, 
-  currentUser
+  currentUser,
+  onRequestDateChange,
+  onRequestClosure
 }: TeamMemberDashboardProps) {
+  const [closureTask, setClosureTask] = useState<Task | null>(null);
+  const [dateChangeTask, setDateChangeTask] = useState<Task | null>(null);
+
   // Filter tasks for current user
   const myTasks = useMemo(() => {
     return tasks.filter(t => t.owner.toLowerCase() === currentUser.toLowerCase());
@@ -69,7 +78,7 @@ export function TeamMemberDashboard({
     });
 
     // Tasks with rejection comments
-    const rejectedClosures = myTasks.filter(t => t.closure_rejection_comment);
+    const rejectedClosures = myTasks.filter(t => t.closure_rejection_comment && t.status === 'open');
 
     return { 
       total, closed, open, blocked, exec, dueToday, overdue, 
@@ -86,7 +95,7 @@ export function TeamMemberDashboard({
     { name: 'Blocked', value: stats.blocked, fill: 'hsl(var(--chart-4))' },
   ].filter(d => d.value > 0);
 
-  // Weekly progress data (mock - you could enhance with real date-based data)
+  // Weekly progress data
   const weeklyData = useMemo(() => {
     const last7Days = [];
     for (let i = 6; i >= 0; i--) {
@@ -104,16 +113,35 @@ export function TeamMemberDashboard({
     return last7Days;
   }, [myTasks]);
 
+  const handleClosureSubmit = async (comment: string) => {
+    if (closureTask && onRequestClosure) {
+      await onRequestClosure(closureTask.id, comment, currentUser);
+      setClosureTask(null);
+    }
+  };
+
+  const handleDateChangeSubmit = async (newDate: string, reason: string) => {
+    if (dateChangeTask && onRequestDateChange) {
+      await onRequestDateChange(dateChangeTask.id, newDate, reason);
+      setDateChangeTask(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Rejection Alerts */}
+      {/* Rejection Alerts - Very prominent */}
       {stats.rejectedClosures.length > 0 && (
         <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-destructive uppercase tracking-wide flex items-center gap-2">
+            <MessageSquareWarning className="h-4 w-4" />
+            HOD Feedback - Action Required
+          </h3>
           {stats.rejectedClosures.map(task => (
             <Alert key={task.id} variant="destructive" className="border-destructive/50 bg-destructive/10">
               <MessageSquareWarning className="h-4 w-4" />
-              <AlertTitle className="font-semibold">Closure Rejected: {task.title}</AlertTitle>
+              <AlertTitle className="font-semibold">{task.title}</AlertTitle>
               <AlertDescription className="mt-1">
+                <span className="text-sm font-medium">HOD Comment:</span>{' '}
                 <span className="text-sm italic">"{task.closure_rejection_comment}"</span>
               </AlertDescription>
             </Alert>
@@ -317,7 +345,7 @@ export function TeamMemberDashboard({
         </Card>
       </div>
 
-      {/* My Tasks Table */}
+      {/* My Tasks Table with Actions */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
@@ -327,37 +355,48 @@ export function TeamMemberDashboard({
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border overflow-hidden">
-            <div className="max-h-[400px] overflow-auto">
+            <div className="max-h-[500px] overflow-auto">
               <Table>
                 <TableHeader className="sticky top-0 bg-muted">
                   <TableRow>
                     <TableHead className="font-semibold">Task</TableHead>
                     <TableHead className="font-semibold">Target Date</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
-                    <TableHead className="font-semibold text-center">Date Moves</TableHead>
+                    <TableHead className="font-semibold text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {myTasks.map(task => {
                     const taskOverdue = isOverdue(task.current_target_date, task.status) && !task.waiting_for_subtask;
                     const taskDueToday = isDueToday(task.current_target_date, task.status) && !task.waiting_for_subtask;
-                    const dateMoves = (task.target_date_history?.length || 1) - 1;
+                    const canRequestClosure = task.status === 'open' && !task.closure_pending && !task.waiting_for_subtask;
+                    const canRequestDateChange = task.status === 'open' && !task.date_change_pending;
                     
                     return (
                       <TableRow key={task.id} className={cn(
                         "bg-card",
                         task.waiting_for_subtask && "bg-amber-500/5",
                         taskOverdue && !task.waiting_for_subtask && "bg-destructive/5",
-                        taskDueToday && !task.waiting_for_subtask && "bg-amber-500/5"
+                        taskDueToday && !task.waiting_for_subtask && "bg-amber-500/5",
+                        task.closure_rejection_comment && "bg-destructive/5"
                       )}>
-                        <TableCell className="font-medium max-w-[250px] truncate">
-                          {task.parent_task_id && (
-                            <span className="text-xs text-muted-foreground mr-1">↳</span>
-                          )}
-                          {task.title}
-                          {task.closure_rejection_comment && (
-                            <Badge variant="destructive" className="ml-2 text-xs">Rejected</Badge>
-                          )}
+                        <TableCell className="max-w-[250px]">
+                          <div className="space-y-1">
+                            <div className="font-medium flex items-center gap-2 flex-wrap">
+                              {task.parent_task_id && (
+                                <span className="text-xs text-muted-foreground">↳</span>
+                              )}
+                              <span className="truncate">{task.title}</span>
+                              {task.closure_rejection_comment && (
+                                <Badge variant="destructive" className="text-xs">Rejected</Badge>
+                              )}
+                            </div>
+                            {task.closure_rejection_comment && (
+                              <div className="text-xs text-destructive italic">
+                                HOD: "{task.closure_rejection_comment}"
+                              </div>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="tabular-nums">
                           <span className={cn(
@@ -382,7 +421,7 @@ export function TeamMemberDashboard({
                             </Badge>
                           ) : task.date_change_pending ? (
                             <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                              Date Change
+                              Date Change Pending
                             </Badge>
                           ) : taskOverdue ? (
                             <Badge variant="destructive">Overdue</Badge>
@@ -394,14 +433,43 @@ export function TeamMemberDashboard({
                             <Badge variant="outline">Open</Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-center">
-                          {dateMoves > 0 ? (
-                            <Badge variant={dateMoves > 2 ? "destructive" : "secondary"} className="text-xs">
-                              {dateMoves}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end">
+                            {canRequestClosure && (
+                              <TooltipProvider>
+                                <UITooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      className="h-7 w-7 p-0"
+                                      onClick={() => setClosureTask(task)}
+                                    >
+                                      <Send className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Request Closure</TooltipContent>
+                                </UITooltip>
+                              </TooltipProvider>
+                            )}
+                            {canRequestDateChange && (
+                              <TooltipProvider>
+                                <UITooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 w-7 p-0"
+                                      onClick={() => setDateChangeTask(task)}
+                                    >
+                                      <CalendarClock className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Request Date Change</TooltipContent>
+                                </UITooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -419,6 +487,21 @@ export function TeamMemberDashboard({
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialogs */}
+      <ClosureRequestDialog
+        open={!!closureTask}
+        onOpenChange={(open) => !open && setClosureTask(null)}
+        taskTitle={closureTask?.title || ''}
+        onSubmit={handleClosureSubmit}
+      />
+
+      <DateChangeDialog
+        open={!!dateChangeTask}
+        onOpenChange={(open) => !open && setDateChangeTask(null)}
+        currentDate={dateChangeTask?.current_target_date || ''}
+        onSubmit={handleDateChangeSubmit}
+      />
     </div>
   );
 }

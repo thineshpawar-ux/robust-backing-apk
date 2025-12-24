@@ -19,7 +19,7 @@ export function Header({ connected, activeView, onViewChange, userEmail, current
       <div className="font-semibold text-base">
         Supplier Quality To-Do List
         <span className="block text-xs text-muted-foreground font-normal mt-0.5">
-          One team view and one HOD summary. Zero excuses.
+          {isHOD ? 'Team overview and task management.' : 'Your personal task dashboard.'}
         </span>
       </div>
       
@@ -41,32 +41,35 @@ export function Header({ connected, activeView, onViewChange, userEmail, current
           {connected ? 'Cloud: connected' : 'Cloud: connecting...'}
         </span>
         
-        <div className="inline-flex rounded-full border border-border bg-card p-0.5">
-          <button
-            type="button"
-            onClick={() => onViewChange('team')}
-            className={cn(
-              "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
-              activeView === 'team' 
-                ? "bg-primary text-primary-foreground" 
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Team
-          </button>
-          <button
-            type="button"
-            onClick={() => onViewChange('hod')}
-            className={cn(
-              "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
-              activeView === 'hod' 
-                ? "bg-primary text-primary-foreground" 
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            HOD
-          </button>
-        </div>
+        {/* Only show navigation tabs for HOD */}
+        {isHOD && (
+          <div className="inline-flex rounded-full border border-border bg-card p-0.5">
+            <button
+              type="button"
+              onClick={() => onViewChange('team')}
+              className={cn(
+                "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+                activeView === 'team' 
+                  ? "bg-primary text-primary-foreground" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Tasks
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewChange('hod')}
+              className={cn(
+                "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+                activeView === 'hod' 
+                  ? "bg-primary text-primary-foreground" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Dashboard
+            </button>
+          </div>
+        )}
 
         {currentUser && (
           <NotificationBell userId={currentUser} />

@@ -95,57 +95,57 @@ const Index = () => {
           isHOD={currentUserIsHOD}
         />
 
-        <main className="grid grid-cols-1 lg:grid-cols-[1.7fr_1.3fr] gap-4">
-          {activeView === 'team' && (
-            <div className="lg:col-span-2">
-              {currentUserIsHOD ? (
-                <TeamView
+        <main className="grid grid-cols-1 gap-4">
+          {/* Team Member View - Only shows their own dashboard */}
+          {!currentUserIsHOD && (
+            <Card className="border-border">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base">My Dashboard</CardTitle>
+                <CardDescription>Your personal performance and tasks overview.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TeamMemberDashboard 
                   tasks={tasks}
                   currentUser={user?.email?.split('@')[0] || ''}
-                  onAddTask={addTask}
-                  onUpdateTask={updateTask}
-                  onDeleteTask={deleteTask}
                   onRequestDateChange={requestDateChange}
                   onRequestClosure={requestClosure}
                 />
-              ) : (
-                <Card className="border-border">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-base">My Dashboard</CardTitle>
-                    <CardDescription>Your personal performance and tasks overview.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <TeamMemberDashboard 
-                      tasks={tasks}
-                      currentUser={user?.email?.split('@')[0] || ''}
-                    />
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* HOD Views */}
+          {currentUserIsHOD && activeView === 'team' && (
+            <TeamView
+              tasks={tasks}
+              currentUser={user?.email?.split('@')[0] || ''}
+              onAddTask={addTask}
+              onUpdateTask={updateTask}
+              onDeleteTask={deleteTask}
+              onRequestDateChange={requestDateChange}
+              onRequestClosure={requestClosure}
+            />
           )}
           
-          {activeView === 'hod' && currentUserIsHOD && (
-            <div className="lg:col-span-2">
-              <Card className="border-border">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-base">HOD Dashboard</CardTitle>
-                  <CardDescription>IBCS-style summary: volume, execution, slippage, approvals.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <HODDashboard 
-                    tasks={tasks}
-                    currentUserEmail={user?.email}
-                    currentUserId={user?.id}
-                    onApproveDateChange={approveDateChange}
-                    onRejectDateChange={rejectDateChange}
-                    onApproveClosure={approveClosure}
-                    onRejectClosure={rejectClosure}
-                    onAddSubtask={handleAddSubtask}
-                  />
-                </CardContent>
-              </Card>
-            </div>
+          {currentUserIsHOD && activeView === 'hod' && (
+            <Card className="border-border">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base">HOD Dashboard</CardTitle>
+                <CardDescription>IBCS-style summary: volume, execution, slippage, approvals.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <HODDashboard 
+                  tasks={tasks}
+                  currentUserEmail={user?.email}
+                  currentUserId={user?.id}
+                  onApproveDateChange={approveDateChange}
+                  onRejectDateChange={rejectDateChange}
+                  onApproveClosure={approveClosure}
+                  onRejectClosure={rejectClosure}
+                  onAddSubtask={handleAddSubtask}
+                />
+              </CardContent>
+            </Card>
           )}
         </main>
 
