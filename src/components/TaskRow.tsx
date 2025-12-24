@@ -3,7 +3,7 @@ import { isOverdue } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Clock, CheckCircle2, AlertTriangle, Hourglass } from 'lucide-react';
+import { Clock, CheckCircle2, AlertTriangle, Hourglass, CornerDownRight } from 'lucide-react';
 
 interface TaskRowProps {
   task: Task;
@@ -11,9 +11,10 @@ interface TaskRowProps {
   onEdit: (task: Task) => void;
   onRequestClosure: (task: Task) => void;
   onDelete: (task: Task) => void;
+  isSubtask?: boolean;
 }
 
-export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete }: TaskRowProps) {
+export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete, isSubtask }: TaskRowProps) {
   const overdue = isOverdue(task.current_target_date, task.status);
   const dateChanges = (task.target_date_history?.length || 1) - 1;
 
@@ -41,9 +42,17 @@ export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete 
     <div className={cn(
       "rounded-lg border bg-card p-4 mb-3 animate-fade-in transition-all hover:shadow-md",
       task.closure_pending && "border-[hsl(var(--chart-3))] bg-[hsl(var(--chart-3))/0.03]",
-      overdue && !task.closure_pending && "border-destructive/50 bg-destructive/5"
+      overdue && !task.closure_pending && "border-destructive/50 bg-destructive/5",
+      isSubtask && "ml-8 border-l-4 border-l-primary/30"
     )}>
       <div className="flex items-start gap-4">
+        {/* Subtask indicator */}
+        {isSubtask && (
+          <div className="flex-shrink-0 mt-1">
+            <CornerDownRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+        )}
+        
         {/* Status Icon */}
         <div className="flex-shrink-0 mt-1">
           {getStatusIcon()}
@@ -52,7 +61,10 @@ export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete 
         {/* Content */}
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-baseline justify-between gap-2 flex-wrap">
-            <span className="font-medium text-sm text-foreground">{task.title}</span>
+            <span className="font-medium text-sm text-foreground">
+              {isSubtask && <span className="text-muted-foreground mr-1">↳</span>}
+              {task.title}
+            </span>
             <span className="text-xs px-2.5 py-1 rounded-full border border-border bg-muted text-muted-foreground font-medium">
               {task.owner}
             </span>

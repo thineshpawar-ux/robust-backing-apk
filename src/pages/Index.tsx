@@ -8,6 +8,7 @@ import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import { useToast } from '@/hooks/use-toast';
+import { todayISO } from '@/lib/date-utils';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<'team' | 'hod' | 'roles'>('team');
@@ -36,6 +37,44 @@ const Index = () => {
         description: 'You have been logged out successfully.'
       });
     }
+  };
+
+  const handleAddSubtask = async (parentTaskId: string, title: string, owner: string, targetDate: string) => {
+    const today = todayISO();
+    const result = await addTask({
+      title,
+      owner,
+      status: 'open',
+      created_at: today,
+      current_target_date: targetDate,
+      target_date_history: [targetDate],
+      completed_at: null,
+      date_change_pending: false,
+      date_change_reason: null,
+      date_change_requested_date: null,
+      date_change_approved_by: null,
+      closure_pending: false,
+      closure_comment: null,
+      closure_requested_by: null,
+      closure_approved_by: null,
+      parent_task_id: parentTaskId
+    });
+
+    if (result.success) {
+      toast({
+        title: 'Subtask added',
+        description: 'The subtask has been created and the parent task remains open.',
+      });
+      
+      // Also reset the closure pending status of the parent task
+      await updateTask(parentTaskId, {
+        closure_pending: false,
+        closure_comment: null,
+        closure_requested_by: null
+      });
+    }
+
+    return result;
   };
 
   const currentUserIsHOD = isHOD(user?.id);
@@ -84,6 +123,7 @@ const Index = () => {
                     onRejectDateChange={rejectDateChange}
                     onApproveClosure={approveClosure}
                     onRejectClosure={rejectClosure}
+                    onAddSubtask={handleAddSubtask}
                   />
                 </CardContent>
               </Card>

@@ -1,14 +1,11 @@
 import { useState, useMemo } from 'react';
 import { Task, PAGE_SIZE } from '@/types/task';
-import { isOverdue } from '@/lib/date-utils';
 import { TaskRow } from './TaskRow';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface TaskListProps {
   tasks: Task[];
-  filterOwner: string;
-  filterStatus: string;
   currentUser?: string;
   onEdit: (task: Task) => void;
   onRequestClosure: (task: Task) => void;
@@ -17,8 +14,6 @@ interface TaskListProps {
 
 export function TaskList({
   tasks,
-  filterOwner,
-  filterStatus,
   currentUser,
   onEdit,
   onRequestClosure,
@@ -26,40 +21,29 @@ export function TaskList({
 }: TaskListProps) {
   const [page, setPage] = useState(1);
 
-  const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
-      if (filterOwner && filterOwner !== 'all' && task.owner !== filterOwner) return false;
-      
-      if (filterStatus && filterStatus !== 'all') {
-        if (filterStatus === 'overdue') {
-          if (!isOverdue(task.current_target_date, task.status)) return false;
-        } else if (filterStatus === 'pending_closure') {
-          if (!task.closure_pending) return false;
-        } else if (task.status !== filterStatus) {
-          return false;
-        }
-      }
-      
-      return true;
+  // Sort tasks: parent tasks first, then subtasks grouped under their parents
+  const sortedTasks = useMemo(() => {
+    const parentTasks = tasks.filter(t => !t.parent_task_id);
+    const result: Task[] = [];
+    
+    parentTasks.forEach(parent => {
+      result.push(parent);
+      // Add subtasks right after their parent
+      const subtasks = tasks.filter(t => t.parent_task_id === parent.id);
+      result.push(...subtasks);
     });
-  }, [tasks, filterOwner, filterStatus]);
+    
+    return result;
+  }, [tasks]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredTasks.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(sortedTasks.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const pageItems = filteredTasks.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageItems = sortedTasks.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   if (tasks.length === 0) {
     return (
       <div className="text-sm text-muted-foreground py-8 text-center">
         No tasks yet. Start by logging the first one.
-      </div>
-    );
-  }
-
-  if (pageItems.length === 0) {
-    return (
-      <div className="text-sm text-muted-foreground py-8 text-center">
-        No tasks match these filters.
       </div>
     );
   }
@@ -75,6 +59,7 @@ export function TaskList({
             onEdit={onEdit}
             onRequestClosure={onRequestClosure}
             onDelete={onDelete}
+            isSubtask={!!task.parent_task_id}
           />
         ))}
       </div>

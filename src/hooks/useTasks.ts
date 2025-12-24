@@ -35,7 +35,8 @@ export function useTasks() {
         closure_pending: (t as any).closure_pending || false,
         closure_comment: (t as any).closure_comment,
         closure_requested_by: (t as any).closure_requested_by,
-        closure_approved_by: (t as any).closure_approved_by
+        closure_approved_by: (t as any).closure_approved_by,
+        parent_task_id: (t as any).parent_task_id || null
       }));
       
       setTasks(mappedTasks);
@@ -69,7 +70,8 @@ export function useTasks() {
               closure_pending: newTask.closure_pending || false,
               closure_comment: newTask.closure_comment,
               closure_requested_by: newTask.closure_requested_by,
-              closure_approved_by: newTask.closure_approved_by
+              closure_approved_by: newTask.closure_approved_by,
+              parent_task_id: newTask.parent_task_id || null
             };
             setTasks(prev => [mappedTask, ...prev]);
             toast({
@@ -84,7 +86,8 @@ export function useTasks() {
               closure_pending: updated.closure_pending || false,
               closure_comment: updated.closure_comment,
               closure_requested_by: updated.closure_requested_by,
-              closure_approved_by: updated.closure_approved_by
+              closure_approved_by: updated.closure_approved_by,
+              parent_task_id: updated.parent_task_id || null
             };
             setTasks(prev => prev.map(t => t.id === mappedTask.id ? mappedTask : t));
           } else if (payload.eventType === 'DELETE') {
@@ -113,7 +116,8 @@ export function useTasks() {
         closure_pending: task.closure_pending,
         closure_comment: task.closure_comment,
         closure_requested_by: task.closure_requested_by,
-        closure_approved_by: task.closure_approved_by
+        closure_approved_by: task.closure_approved_by,
+        parent_task_id: task.parent_task_id
       });
 
       if (error) throw error;
