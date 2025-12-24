@@ -21,6 +21,8 @@ export interface Task {
   parent_task_id: string | null;
   // Blocked waiting for subtasks - excludes from performance metrics
   waiting_for_subtask: boolean;
+  // HOD rejection comment for closure
+  closure_rejection_comment: string | null;
 }
 
 export type TaskFormData = {

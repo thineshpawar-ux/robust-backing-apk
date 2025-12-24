@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { TeamView } from '@/components/TeamView';
 import { HODDashboard } from '@/components/HODDashboard';
+import { TeamMemberDashboard } from '@/components/TeamMemberDashboard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/hooks/useAuth';
@@ -57,7 +58,8 @@ const Index = () => {
       closure_requested_by: null,
       closure_approved_by: null,
       parent_task_id: parentTaskId,
-      waiting_for_subtask: false
+      waiting_for_subtask: false,
+      closure_rejection_comment: null
     });
 
     if (result.success) {
@@ -96,19 +98,34 @@ const Index = () => {
         <main className="grid grid-cols-1 lg:grid-cols-[1.7fr_1.3fr] gap-4">
           {activeView === 'team' && (
             <div className="lg:col-span-2">
-              <TeamView
-                tasks={tasks}
-                currentUser={user?.email?.split('@')[0] || ''}
-                onAddTask={addTask}
-                onUpdateTask={updateTask}
-                onDeleteTask={deleteTask}
-                onRequestDateChange={requestDateChange}
-                onRequestClosure={requestClosure}
-              />
+              {currentUserIsHOD ? (
+                <TeamView
+                  tasks={tasks}
+                  currentUser={user?.email?.split('@')[0] || ''}
+                  onAddTask={addTask}
+                  onUpdateTask={updateTask}
+                  onDeleteTask={deleteTask}
+                  onRequestDateChange={requestDateChange}
+                  onRequestClosure={requestClosure}
+                />
+              ) : (
+                <Card className="border-border">
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-base">My Dashboard</CardTitle>
+                    <CardDescription>Your personal performance and tasks overview.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <TeamMemberDashboard 
+                      tasks={tasks}
+                      currentUser={user?.email?.split('@')[0] || ''}
+                    />
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
           
-          {activeView === 'hod' && (
+          {activeView === 'hod' && currentUserIsHOD && (
             <div className="lg:col-span-2">
               <Card className="border-border">
                 <CardHeader className="pb-4">

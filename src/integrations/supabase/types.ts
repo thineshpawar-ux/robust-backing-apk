@@ -60,6 +60,7 @@ export type Database = {
           closure_approved_by: string | null
           closure_comment: string | null
           closure_pending: boolean
+          closure_rejection_comment: string | null
           closure_requested_by: string | null
           completed_at: string | null
           created_at: string
@@ -81,6 +82,7 @@ export type Database = {
           closure_approved_by?: string | null
           closure_comment?: string | null
           closure_pending?: boolean
+          closure_rejection_comment?: string | null
           closure_requested_by?: string | null
           completed_at?: string | null
           created_at?: string
@@ -102,6 +104,7 @@ export type Database = {
           closure_approved_by?: string | null
           closure_comment?: string | null
           closure_pending?: boolean
+          closure_rejection_comment?: string | null
           closure_requested_by?: string | null
           completed_at?: string | null
           created_at?: string
