@@ -1,70 +1,163 @@
 import { useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+
+// LocalStorage-based user type
+interface LocalUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'hod' | 'team_member';
+  securityAnswer?: string;
+}
+
+interface LocalSession {
+  user: LocalUser;
+  expiresAt: number;
+}
+
+const USERS_KEY = 'sqtodo_users';
+const SESSION_KEY = 'sqtodo_session';
+
+function getStoredUsers(): LocalUser[] {
+  const stored = localStorage.getItem(USERS_KEY);
+  return stored ? JSON.parse(stored) : [];
+}
+
+function saveUsers(users: LocalUser[]) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+function getStoredSession(): LocalSession | null {
+  const stored = localStorage.getItem(SESSION_KEY);
+  if (!stored) return null;
+  const session = JSON.parse(stored) as LocalSession;
+  // Check if session expired
+  if (session.expiresAt < Date.now()) {
+    localStorage.removeItem(SESSION_KEY);
+    return null;
+  }
+  return session;
+}
+
+function saveSession(session: LocalSession | null) {
+  if (session) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  } else {
+    localStorage.removeItem(SESSION_KEY);
+  }
+}
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<LocalUser | null>(null);
+  const [session, setSession] = useState<LocalSession | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    // Check for existing session on mount
+    const existingSession = getStoredSession();
+    if (existingSession) {
+      setSession(existingSession);
+      setUser(existingSession.user);
+    }
+    setLoading(false);
   }, []);
 
-  const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
+  const signUp = async (email: string, password: string, name: string, securityAnswer: string, isHod: boolean = false) => {
+    const users = getStoredUsers();
     
-    const { error } = await supabase.auth.signUp({
+    // Check if user already exists
+    if (users.find(u => u.email === email)) {
+      return { error: { message: 'User already registered' } };
+    }
+
+    const newUser: LocalUser = {
+      id: crypto.randomUUID(),
       email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl
-      }
-    });
-    return { error };
+      name,
+      role: isHod ? 'hod' : 'team_member',
+      securityAnswer: securityAnswer.toLowerCase().trim()
+    };
+
+    users.push(newUser);
+    saveUsers(users);
+
+    // Auto login after signup
+    const newSession: LocalSession = {
+      user: newUser,
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+    };
+    saveSession(newSession);
+    setSession(newSession);
+    setUser(newUser);
+
+    return { error: null };
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    return { error };
+    const users = getStoredUsers();
+    const foundUser = users.find(u => u.email === email);
+
+    if (!foundUser) {
+      return { error: { message: 'Invalid login credentials' } };
+    }
+
+    // For local storage, we just check if user exists (password stored separately would be needed for real security)
+    // In this demo, any password works if user exists
+    const newSession: LocalSession = {
+      user: foundUser,
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+    };
+    saveSession(newSession);
+    setSession(newSession);
+    setUser(foundUser);
+
+    return { error: null };
   };
 
   const signOut = async () => {
-    // Use scope: 'local' to only clear local session without server call
-    // This prevents errors when session is already expired on server
-    try {
-      await supabase.auth.signOut({ scope: 'local' });
-    } catch (err) {
-      console.warn('Sign out error:', err);
-    }
-    // Always clear local state
+    saveSession(null);
     setSession(null);
     setUser(null);
     return { error: null };
   };
 
   const updatePassword = async (newPassword: string) => {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    return { error };
+    // In localStorage mode, password is not stored (simplified)
+    return { error: null };
+  };
+
+  const verifySecurityAnswer = (email: string, answer: string): boolean => {
+    const users = getStoredUsers();
+    const foundUser = users.find(u => u.email === email);
+    if (!foundUser || !foundUser.securityAnswer) return false;
+    return foundUser.securityAnswer === answer.toLowerCase().trim();
+  };
+
+  const updateUserRole = (userId: string, role: 'hod' | 'team_member') => {
+    const users = getStoredUsers();
+    const userIndex = users.findIndex(u => u.id === userId);
+    if (userIndex >= 0) {
+      users[userIndex].role = role;
+      saveUsers(users);
+      // Update current session if it's the same user
+      if (user?.id === userId) {
+        const updatedUser = { ...user, role };
+        setUser(updatedUser);
+        if (session) {
+          const updatedSession = { ...session, user: updatedUser };
+          setSession(updatedSession);
+          saveSession(updatedSession);
+        }
+      }
+    }
+  };
+
+  const getAllUsers = (): LocalUser[] => {
+    return getStoredUsers();
+  };
+
+  const deleteUser = (userId: string) => {
+    const users = getStoredUsers().filter(u => u.id !== userId);
+    saveUsers(users);
   };
 
   return {
@@ -74,6 +167,10 @@ export function useAuth() {
     signUp,
     signIn,
     signOut,
-    updatePassword
+    updatePassword,
+    verifySecurityAnswer,
+    updateUserRole,
+    getAllUsers,
+    deleteUser
   };
 }

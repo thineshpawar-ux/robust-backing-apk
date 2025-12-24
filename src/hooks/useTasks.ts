@@ -1,132 +1,59 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Task } from '@/types/task';
 import { useToast } from '@/hooks/use-toast';
+
+const TASKS_KEY = 'sqtodo_tasks';
+
+function getStoredTasks(): Task[] {
+  const stored = localStorage.getItem(TASKS_KEY);
+  return stored ? JSON.parse(stored) : [];
+}
+
+function saveTasks(tasks: Task[]) {
+  localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+}
 
 export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(true); // Always connected in localStorage mode
   const { toast } = useToast();
 
-  const fetchTasks = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      const mappedTasks: Task[] = (data || []).map(t => ({
-        id: t.id,
-        title: t.title,
-        owner: t.owner,
-        status: t.status as 'open' | 'closed',
-        created_at: t.created_at,
-        current_target_date: t.current_target_date,
-        target_date_history: t.target_date_history || [],
-        completed_at: t.completed_at,
-        updated_at: t.updated_at,
-        date_change_pending: t.date_change_pending || false,
-        date_change_reason: t.date_change_reason,
-        date_change_requested_date: t.date_change_requested_date,
-        date_change_approved_by: t.date_change_approved_by,
-        closure_pending: (t as any).closure_pending || false,
-        closure_comment: (t as any).closure_comment,
-        closure_requested_by: (t as any).closure_requested_by,
-        closure_approved_by: (t as any).closure_approved_by,
-        parent_task_id: (t as any).parent_task_id || null,
-        waiting_for_subtask: (t as any).waiting_for_subtask || false,
-        closure_rejection_comment: (t as any).closure_rejection_comment || null
-      }));
-      
-      setTasks(mappedTasks);
-      setConnected(true);
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
-      setConnected(false);
-    } finally {
-      setLoading(false);
-    }
+  const fetchTasks = useCallback(() => {
+    const storedTasks = getStoredTasks();
+    setTasks(storedTasks);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
     fetchTasks();
-
-    const channel = supabase
-      .channel('tasks-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tasks'
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newTask = payload.new as any;
-            const mappedTask: Task = {
-              ...newTask,
-              status: newTask.status as 'open' | 'closed',
-              closure_pending: newTask.closure_pending || false,
-              closure_comment: newTask.closure_comment,
-              closure_requested_by: newTask.closure_requested_by,
-              closure_approved_by: newTask.closure_approved_by,
-              parent_task_id: newTask.parent_task_id || null,
-              waiting_for_subtask: newTask.waiting_for_subtask || false,
-              closure_rejection_comment: newTask.closure_rejection_comment || null
-            };
-            setTasks(prev => [mappedTask, ...prev]);
-            toast({
-              title: 'New task',
-              description: `Task created for ${mappedTask.owner}`,
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as any;
-            const mappedTask: Task = {
-              ...updated,
-              status: updated.status as 'open' | 'closed',
-              closure_pending: updated.closure_pending || false,
-              closure_comment: updated.closure_comment,
-              closure_requested_by: updated.closure_requested_by,
-              closure_approved_by: updated.closure_approved_by,
-              parent_task_id: updated.parent_task_id || null,
-              waiting_for_subtask: updated.waiting_for_subtask || false,
-              closure_rejection_comment: updated.closure_rejection_comment || null
-            };
-            setTasks(prev => prev.map(t => t.id === mappedTask.id ? mappedTask : t));
-          } else if (payload.eventType === 'DELETE') {
-            const deleted = payload.old as { id: string };
-            setTasks(prev => prev.filter(t => t.id !== deleted.id));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
+    
+    // Listen for storage events from other tabs
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === TASKS_KEY) {
+        fetchTasks();
+      }
     };
-  }, [fetchTasks, toast]);
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [fetchTasks]);
 
   const addTask = async (task: Omit<Task, 'id' | 'updated_at'>) => {
     try {
-      const { error } = await supabase.from('tasks').insert({
-        title: task.title,
-        owner: task.owner,
-        status: task.status,
-        created_at: task.created_at,
-        current_target_date: task.current_target_date,
-        target_date_history: task.target_date_history,
-        completed_at: task.completed_at,
-        closure_pending: task.closure_pending,
-        closure_comment: task.closure_comment,
-        closure_requested_by: task.closure_requested_by,
-        closure_approved_by: task.closure_approved_by,
-        parent_task_id: task.parent_task_id
+      const newTask: Task = {
+        ...task,
+        id: crypto.randomUUID(),
+        updated_at: new Date().toISOString()
+      };
+      
+      const updatedTasks = [newTask, ...tasks];
+      setTasks(updatedTasks);
+      saveTasks(updatedTasks);
+      
+      toast({
+        title: 'New task',
+        description: `Task created for ${newTask.owner}`,
       });
-
-      if (error) throw error;
       return { success: true };
     } catch (error) {
       console.error('Error adding task:', error);
@@ -136,16 +63,15 @@ export function useTasks() {
 
   const updateTask = async (id: string, updates: Partial<Task>) => {
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .update(updates)
-        .eq('id', id);
-
-      if (error) throw error;
+      const updatedTasks = tasks.map(t => 
+        t.id === id ? { ...t, ...updates, updated_at: new Date().toISOString() } : t
+      );
+      setTasks(updatedTasks);
+      saveTasks(updatedTasks);
       
       toast({
         title: 'Task updated',
-        description: `Changes saved successfully`,
+        description: 'Changes saved successfully',
       });
       return { success: true };
     } catch (error) {
@@ -156,12 +82,9 @@ export function useTasks() {
 
   const deleteTask = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      const updatedTasks = tasks.filter(t => t.id !== id);
+      setTasks(updatedTasks);
+      saveTasks(updatedTasks);
       
       toast({
         title: 'Task deleted',
@@ -176,16 +99,17 @@ export function useTasks() {
 
   const requestDateChange = async (taskId: string, newDate: string, reason: string) => {
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({
+      const updatedTasks = tasks.map(t => 
+        t.id === taskId ? {
+          ...t,
           date_change_pending: true,
           date_change_requested_date: newDate,
-          date_change_reason: reason
-        })
-        .eq('id', taskId);
-
-      if (error) throw error;
+          date_change_reason: reason,
+          updated_at: new Date().toISOString()
+        } : t
+      );
+      setTasks(updatedTasks);
+      saveTasks(updatedTasks);
       
       toast({
         title: 'Date change requested',
@@ -200,16 +124,17 @@ export function useTasks() {
 
   const requestClosure = async (taskId: string, comment: string, requestedBy: string) => {
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({
+      const updatedTasks = tasks.map(t => 
+        t.id === taskId ? {
+          ...t,
           closure_pending: true,
           closure_comment: comment,
-          closure_requested_by: requestedBy
-        })
-        .eq('id', taskId);
-
-      if (error) throw error;
+          closure_requested_by: requestedBy,
+          updated_at: new Date().toISOString()
+        } : t
+      );
+      setTasks(updatedTasks);
+      saveTasks(updatedTasks);
       
       toast({
         title: 'Closure requested',
@@ -227,38 +152,36 @@ export function useTasks() {
       const task = tasks.find(t => t.id === taskId);
       if (!task) return { success: false };
 
-      const { error } = await supabase
-        .from('tasks')
-        .update({
-          status: 'closed',
+      let updatedTasks = tasks.map(t => 
+        t.id === taskId ? {
+          ...t,
+          status: 'closed' as const,
           completed_at: new Date().toISOString().split('T')[0],
           closure_pending: false,
           closure_approved_by: approvedBy,
-          closure_rejection_comment: null
-        })
-        .eq('id', taskId);
-
-      if (error) throw error;
+          closure_rejection_comment: null,
+          updated_at: new Date().toISOString()
+        } : t
+      );
 
       // Check if this task has a parent that's waiting for subtasks
       if (task.parent_task_id) {
-        // Check if all subtasks of the parent are now closed
-        const siblingSubtasks = tasks.filter(t => 
+        const siblingSubtasks = updatedTasks.filter(t => 
           t.parent_task_id === task.parent_task_id && t.id !== taskId
         );
         const allSubtasksClosed = siblingSubtasks.every(t => t.status === 'closed');
         
         if (allSubtasksClosed) {
-          // Auto-close the parent task
-          await supabase
-            .from('tasks')
-            .update({
-              status: 'closed',
+          updatedTasks = updatedTasks.map(t => 
+            t.id === task.parent_task_id ? {
+              ...t,
+              status: 'closed' as const,
               completed_at: new Date().toISOString().split('T')[0],
-              waiting_for_subtask: false
-            })
-            .eq('id', task.parent_task_id);
-            
+              waiting_for_subtask: false,
+              updated_at: new Date().toISOString()
+            } : t
+          );
+          
           toast({
             title: 'Parent task auto-closed',
             description: 'All subtasks completed, parent task is now closed',
@@ -266,14 +189,12 @@ export function useTasks() {
         }
       }
 
-      // Create notification for task owner
-      await supabase.from('notifications').insert({
-        user_id: task.owner,
-        title: 'Task Closure Approved',
-        message: `Your closure request for "${task.title}" has been approved.`,
-        type: 'success',
-        task_id: taskId
-      });
+      setTasks(updatedTasks);
+      saveTasks(updatedTasks);
+      
+      // Add notification
+      addNotification(task.owner, 'Task Closure Approved', 
+        `Your closure request for "${task.title}" has been approved.`, 'success', taskId);
       
       toast({
         title: 'Closure approved',
@@ -290,27 +211,22 @@ export function useTasks() {
     try {
       const task = tasks.find(t => t.id === taskId);
       
-      const { error } = await supabase
-        .from('tasks')
-        .update({
+      const updatedTasks = tasks.map(t => 
+        t.id === taskId ? {
+          ...t,
           closure_pending: false,
           closure_comment: null,
           closure_requested_by: null,
-          closure_rejection_comment: rejectionComment
-        })
-        .eq('id', taskId);
+          closure_rejection_comment: rejectionComment,
+          updated_at: new Date().toISOString()
+        } : t
+      );
+      setTasks(updatedTasks);
+      saveTasks(updatedTasks);
 
-      if (error) throw error;
-
-      // Create notification for task owner
       if (task) {
-        await supabase.from('notifications').insert({
-          user_id: task.owner,
-          title: 'Task Closure Rejected',
-          message: `Your closure request for "${task.title}" has been rejected. Reason: ${rejectionComment}`,
-          type: 'warning',
-          task_id: taskId
-        });
+        addNotification(task.owner, 'Task Closure Rejected', 
+          `Your closure request for "${task.title}" has been rejected. Reason: ${rejectionComment}`, 'warning', taskId);
       }
       
       toast({
@@ -331,28 +247,23 @@ export function useTasks() {
 
       const newHistory = [...(task.target_date_history || []), task.date_change_requested_date];
 
-      const { error } = await supabase
-        .from('tasks')
-        .update({
-          current_target_date: task.date_change_requested_date,
+      const updatedTasks = tasks.map(t => 
+        t.id === taskId ? {
+          ...t,
+          current_target_date: task.date_change_requested_date!,
           target_date_history: newHistory,
           date_change_pending: false,
           date_change_requested_date: null,
           date_change_reason: null,
-          date_change_approved_by: approvedBy
-        })
-        .eq('id', taskId);
+          date_change_approved_by: approvedBy,
+          updated_at: new Date().toISOString()
+        } : t
+      );
+      setTasks(updatedTasks);
+      saveTasks(updatedTasks);
 
-      if (error) throw error;
-
-      // Create notification for task owner
-      await supabase.from('notifications').insert({
-        user_id: task.owner,
-        title: 'Date Change Approved',
-        message: `Your date change request for "${task.title}" has been approved. New target date: ${task.date_change_requested_date}`,
-        type: 'success',
-        task_id: taskId
-      });
+      addNotification(task.owner, 'Date Change Approved', 
+        `Your date change request for "${task.title}" has been approved. New target date: ${task.date_change_requested_date}`, 'success', taskId);
       
       toast({
         title: 'Date change approved',
@@ -369,26 +280,21 @@ export function useTasks() {
     try {
       const task = tasks.find(t => t.id === taskId);
       
-      const { error } = await supabase
-        .from('tasks')
-        .update({
+      const updatedTasks = tasks.map(t => 
+        t.id === taskId ? {
+          ...t,
           date_change_pending: false,
           date_change_requested_date: null,
-          date_change_reason: null
-        })
-        .eq('id', taskId);
+          date_change_reason: null,
+          updated_at: new Date().toISOString()
+        } : t
+      );
+      setTasks(updatedTasks);
+      saveTasks(updatedTasks);
 
-      if (error) throw error;
-
-      // Create notification for task owner
       if (task) {
-        await supabase.from('notifications').insert({
-          user_id: task.owner,
-          title: 'Date Change Rejected',
-          message: `Your date change request for "${task.title}" has been rejected.`,
-          type: 'warning',
-          task_id: taskId
-        });
+        addNotification(task.owner, 'Date Change Rejected', 
+          `Your date change request for "${task.title}" has been rejected.`, 'warning', taskId);
       }
       
       toast({
@@ -416,4 +322,23 @@ export function useTasks() {
     approveDateChange,
     rejectDateChange
   };
+}
+
+// Helper to add notifications (used by task operations)
+const NOTIFICATIONS_KEY = 'sqtodo_notifications';
+
+function addNotification(userId: string, title: string, message: string, type: 'info' | 'success' | 'warning', taskId: string) {
+  const stored = localStorage.getItem(NOTIFICATIONS_KEY);
+  const notifications = stored ? JSON.parse(stored) : [];
+  notifications.unshift({
+    id: crypto.randomUUID(),
+    user_id: userId,
+    title,
+    message,
+    type,
+    read: false,
+    task_id: taskId,
+    created_at: new Date().toISOString()
+  });
+  localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notifications.slice(0, 100))); // Keep last 100
 }

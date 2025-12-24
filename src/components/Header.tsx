@@ -35,10 +35,10 @@ export function Header({ connected, activeView, onViewChange, userEmail, current
             "text-xs border rounded-full px-2.5 py-1 transition-colors",
             connected 
               ? "border-success text-success bg-success/10" 
-              : "border-destructive text-destructive bg-destructive/10"
+              : "border-muted text-muted-foreground bg-muted/10"
           )}
         >
-          {connected ? 'Cloud: connected' : 'Cloud: connecting...'}
+          {connected ? '💾 Local Storage' : 'Loading...'}
         </span>
         
         {/* Only show navigation tabs for HOD */}
