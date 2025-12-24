@@ -1,12 +1,12 @@
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { LogOut, Shield } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 
 interface HeaderProps {
   connected: boolean;
-  activeView: 'team' | 'hod' | 'roles';
-  onViewChange: (view: 'team' | 'hod' | 'roles') => void;
+  activeView: 'team' | 'hod';
+  onViewChange: (view: 'team' | 'hod') => void;
   userEmail?: string;
   currentUser?: string;
   onSignOut: () => void;
@@ -66,21 +66,6 @@ export function Header({ connected, activeView, onViewChange, userEmail, current
           >
             HOD
           </button>
-          {isHOD && (
-            <button
-              type="button"
-              onClick={() => onViewChange('roles')}
-              className={cn(
-                "rounded-full px-4 py-1.5 text-sm font-medium transition-colors flex items-center gap-1",
-                activeView === 'roles' 
-                  ? "bg-primary text-primary-foreground" 
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Shield className="h-3.5 w-3.5" />
-              Roles
-            </button>
-          )}
         </div>
 
         {currentUser && (

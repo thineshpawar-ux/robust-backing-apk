@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Header } from '@/components/Header';
 import { TeamView } from '@/components/TeamView';
 import { HODDashboard } from '@/components/HODDashboard';
-import { RoleManagement } from '@/components/RoleManagement';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { todayISO } from '@/lib/date-utils';
 
 const Index = () => {
-  const [activeView, setActiveView] = useState<'team' | 'hod' | 'roles'>('team');
+  const [activeView, setActiveView] = useState<'team' | 'hod'>('team');
   const { tasks, loading, connected, addTask, updateTask, deleteTask, requestDateChange, requestClosure, approveClosure, rejectClosure, approveDateChange, rejectDateChange } = useTasks();
   const { user, signOut } = useAuth();
   const { fetchCurrentUserRole, isHOD } = useUserRoles();
@@ -127,12 +126,6 @@ const Index = () => {
                   />
                 </CardContent>
               </Card>
-            </div>
-          )}
-
-          {activeView === 'roles' && (
-            <div className="lg:col-span-2">
-              <RoleManagement currentUserId={user?.id} />
             </div>
           )}
         </main>
