@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -39,156 +40,93 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Shield, User, Crown, Users, UserPlus, Trash2, KeyRound, Settings } from 'lucide-react';
+import { Shield, User, Crown, Users, UserPlus, Trash2, Edit, Settings, UserCheck, UserX } from 'lucide-react';
 import { useUserRoles, AppRole, UserRole } from '@/hooks/useUserRoles';
+import { useTeamMembers, TeamMember } from '@/hooks/useTeamMembers';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { TEAM_MEMBERS } from '@/types/task';
 
 interface HODAdminPanelProps {
   currentUserId?: string;
 }
 
 export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
-  const { userRoles, loading, updateUserRole, isHOD, fetchUserRoles } = useUserRoles();
+  const { userRoles, loading: rolesLoading, updateUserRole, isHOD, fetchUserRoles } = useUserRoles();
+  const { teamMembers, loading: membersLoading, addTeamMember, updateTeamMember, deleteTeamMember, fetchTeamMembers } = useTeamMembers();
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<AppRole>('team_member');
+  
+  // Add member dialog
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
-  const [newMemberPassword, setNewMemberPassword] = useState('');
-  const [newMemberRole, setNewMemberRole] = useState<AppRole>('team_member');
+  const [newMemberIsHod, setNewMemberIsHod] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
+  
+  // Edit member dialog
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editIsHod, setEditIsHod] = useState(false);
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [editLoading, setEditLoading] = useState(false);
+  
   const { toast } = useToast();
 
   const canManageRoles = isHOD(currentUserId);
 
-  // Get list of users not yet registered
-  const registeredEmails = userRoles.map(r => r.user_email.toLowerCase());
-  const allPossibleUsers = ['Hariharan', ...TEAM_MEMBERS];
-  const unregisteredUsers = allPossibleUsers.filter(
-    name => !registeredEmails.includes(`${name.toLowerCase().replace(/\s+/g, '')}@sqtodo.local`)
-  );
-
   const handleRoleChange = async (userId: string) => {
     await updateUserRole(userId, selectedRole);
-    toast({
-      title: 'Role updated',
-      description: 'User role has been changed successfully.'
-    });
     setEditingUser(null);
   };
 
   const handleAddMember = async () => {
-    if (!newMemberName || !newMemberPassword) {
+    if (!newMemberName.trim()) {
       toast({
-        title: 'Missing fields',
-        description: 'Please fill in all fields.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    if (newMemberPassword.length < 4) {
-      toast({
-        title: 'Password too short',
-        description: 'Password must be at least 4 characters.',
+        title: 'Name required',
+        description: 'Please enter a name for the team member.',
         variant: 'destructive'
       });
       return;
     }
 
     setAddLoading(true);
-    const email = `${newMemberName.toLowerCase().replace(/\s+/g, '')}@sqtodo.local`;
-
-    try {
-      // Sign up the new user
-      const { error } = await supabase.auth.signUp({
-        email,
-        password: newMemberPassword,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`
-        }
-      });
-
-      if (error) {
-        if (error.message.includes('already registered')) {
-          toast({
-            title: 'User exists',
-            description: 'This user is already registered.',
-            variant: 'destructive'
-          });
-        } else {
-          toast({
-            title: 'Failed to add user',
-            description: error.message,
-            variant: 'destructive'
-          });
-        }
-        return;
-      }
-
-      // If role is HOD, update it after a short delay (trigger creates team_member by default)
-      if (newMemberRole === 'hod') {
-        setTimeout(async () => {
-          const { data: newUserRole } = await supabase
-            .from('user_roles')
-            .select('user_id')
-            .eq('user_email', email)
-            .single();
-          
-          if (newUserRole) {
-            await updateUserRole(newUserRole.user_id, 'hod');
-          }
-          fetchUserRoles();
-        }, 2000);
-      }
-
-      toast({
-        title: 'Member added!',
-        description: `${newMemberName} has been registered successfully.`
-      });
-      
+    const result = await addTeamMember(newMemberName, newMemberIsHod);
+    
+    if (result.success) {
       setAddDialogOpen(false);
       setNewMemberName('');
-      setNewMemberPassword('');
-      setNewMemberRole('team_member');
-      
-      // Refresh user list
-      setTimeout(() => fetchUserRoles(), 2000);
-      
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: 'Failed to add team member.',
-        variant: 'destructive'
-      });
-    } finally {
-      setAddLoading(false);
+      setNewMemberIsHod(false);
     }
+    setAddLoading(false);
   };
 
-  const handleDeleteUser = async (userRole: UserRole) => {
-    // Delete from user_roles table
-    const { error } = await supabase
-      .from('user_roles')
-      .delete()
-      .eq('user_id', userRole.user_id);
+  const openEditDialog = (member: TeamMember) => {
+    setEditingMember(member);
+    setEditName(member.name);
+    setEditIsHod(member.is_hod);
+    setEditIsActive(member.is_active);
+    setEditDialogOpen(true);
+  };
 
-    if (error) {
-      toast({
-        title: 'Delete failed',
-        description: error.message,
-        variant: 'destructive'
-      });
-      return;
-    }
+  const handleEditMember = async () => {
+    if (!editingMember || !editName.trim()) return;
 
-    toast({
-      title: 'User removed',
-      description: `${userRole.user_email} has been removed from the team.`
+    setEditLoading(true);
+    const result = await updateTeamMember(editingMember.id, {
+      name: editName.trim(),
+      is_hod: editIsHod,
+      is_active: editIsActive
     });
     
-    fetchUserRoles();
+    if (result.success) {
+      setEditDialogOpen(false);
+      setEditingMember(null);
+    }
+    setEditLoading(false);
+  };
+
+  const handleDeleteMember = async (member: TeamMember) => {
+    await deleteTeamMember(member.id, member.name);
   };
 
   const getRoleBadge = (role: AppRole) => {
@@ -208,8 +146,12 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
     );
   };
 
-  const hodCount = userRoles.filter(r => r.role === 'hod').length;
-  const teamMemberCount = userRoles.filter(r => r.role === 'team_member').length;
+  const hodCount = teamMembers.filter(m => m.is_hod).length;
+  const activeCount = teamMembers.filter(m => m.is_active).length;
+  const inactiveCount = teamMembers.filter(m => !m.is_active).length;
+
+  // Check which team members have registered accounts
+  const registeredEmails = userRoles.map(r => r.user_email.toLowerCase());
 
   if (!canManageRoles) {
     return (
@@ -221,11 +163,13 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
     );
   }
 
+  const loading = rolesLoading || membersLoading;
+
   if (loading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-8">
-          <div className="text-sm text-muted-foreground">Loading users...</div>
+          <div className="text-sm text-muted-foreground">Loading...</div>
         </CardContent>
       </Card>
     );
@@ -247,7 +191,18 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
       </Card>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <div className="text-2xl font-bold">{teamMembers.length}</div>
+              <div className="text-xs text-muted-foreground">Total Members</div>
+            </div>
+          </CardContent>
+        </Card>
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center">
@@ -255,40 +210,40 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
             </div>
             <div>
               <div className="text-2xl font-bold">{hodCount}</div>
-              <div className="text-xs text-muted-foreground">HOD Users</div>
+              <div className="text-xs text-muted-foreground">HOD Members</div>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="flex items-center gap-3 p-4">
-            <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
-              <Users className="h-5 w-5 text-primary" />
+            <div className="h-10 w-10 rounded-full bg-[hsl(var(--chart-2))]/20 flex items-center justify-center">
+              <UserCheck className="h-5 w-5 text-[hsl(var(--chart-2))]" />
             </div>
             <div>
-              <div className="text-2xl font-bold">{teamMemberCount}</div>
-              <div className="text-xs text-muted-foreground">Team Members</div>
+              <div className="text-2xl font-bold">{activeCount}</div>
+              <div className="text-xs text-muted-foreground">Active</div>
             </div>
           </CardContent>
         </Card>
-        <Card className="col-span-2 md:col-span-1">
+        <Card>
           <CardContent className="flex items-center gap-3 p-4">
             <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-              <UserPlus className="h-5 w-5 text-muted-foreground" />
+              <UserX className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <div className="text-2xl font-bold">{unregisteredUsers.length}</div>
-              <div className="text-xs text-muted-foreground">Not Registered</div>
+              <div className="text-2xl font-bold">{inactiveCount}</div>
+              <div className="text-xs text-muted-foreground">Inactive</div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Actions */}
+      {/* Team Members Management */}
       <Card>
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
             <Settings className="h-4 w-4" />
-            Team Management
+            Team Members
           </CardTitle>
           <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>
@@ -301,55 +256,32 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
               <DialogHeader>
                 <DialogTitle>Add New Team Member</DialogTitle>
                 <DialogDescription>
-                  Create an account for a new team member
+                  Add a new person to the team. They can then sign up to access the system.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label>Name</Label>
-                  <Select value={newMemberName} onValueChange={setNewMemberName}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select member name" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {unregisteredUsers.map(user => (
-                        <SelectItem key={user} value={user}>
-                          {user}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {unregisteredUsers.length === 0 && (
-                    <p className="text-xs text-muted-foreground">All team members are registered</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Initial Password</Label>
                   <Input
-                    type="password"
-                    value={newMemberPassword}
-                    onChange={(e) => setNewMemberPassword(e.target.value)}
-                    placeholder="Set initial password (min 4 chars)"
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    placeholder="Enter member name"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Role</Label>
-                  <Select value={newMemberRole} onValueChange={(v: AppRole) => setNewMemberRole(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="team_member">Team Member</SelectItem>
-                      <SelectItem value="hod">HOD</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="new-is-hod">HOD Role</Label>
+                  <Switch
+                    id="new-is-hod"
+                    checked={newMemberIsHod}
+                    onCheckedChange={setNewMemberIsHod}
+                  />
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleAddMember} disabled={addLoading || !newMemberName}>
+                <Button onClick={handleAddMember} disabled={addLoading || !newMemberName.trim()}>
                   {addLoading ? 'Adding...' : 'Add Member'}
                 </Button>
               </DialogFooter>
@@ -357,9 +289,188 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
           </Dialog>
         </CardHeader>
         <CardContent>
-          {userRoles.length === 0 ? (
+          {teamMembers.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No users found. Add team members to get started.
+              No team members found. Add members to get started.
+            </div>
+          ) : (
+            <div className="rounded-lg border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="font-semibold">Name</TableHead>
+                    <TableHead className="font-semibold">Email</TableHead>
+                    <TableHead className="font-semibold">Role</TableHead>
+                    <TableHead className="font-semibold">Status</TableHead>
+                    <TableHead className="font-semibold">Registered</TableHead>
+                    <TableHead className="text-right font-semibold">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {teamMembers.map((member) => {
+                    const isRegistered = registeredEmails.includes(member.email);
+                    
+                    return (
+                      <TableRow key={member.id} className={!member.is_active ? "bg-muted/30 opacity-60" : "bg-card"}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium uppercase">
+                              {member.name.charAt(0)}
+                            </div>
+                            <span className="font-medium">{member.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {member.email}
+                        </TableCell>
+                        <TableCell>
+                          {member.is_hod ? (
+                            <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30">
+                              <Crown className="h-3 w-3 mr-1" />
+                              HOD
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">
+                              <User className="h-3 w-3 mr-1" />
+                              Member
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {member.is_active ? (
+                            <Badge variant="outline" className="text-[hsl(var(--chart-2))] border-[hsl(var(--chart-2))]/30">
+                              Active
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              Inactive
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {isRegistered ? (
+                            <Badge variant="outline" className="text-[hsl(var(--chart-2))] border-[hsl(var(--chart-2))]/30">
+                              Yes
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              No
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => openEditDialog(member)}
+                              title="Edit member"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Delete member"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Team Member?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently remove <strong>{member.name}</strong> from the team.
+                                    {isRegistered && " Their account will remain but they won't appear in team lists."}
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => handleDeleteMember(member)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Edit Member Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Team Member</DialogTitle>
+            <DialogDescription>
+              Update team member details
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Enter member name"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="edit-is-hod">HOD Role</Label>
+              <Switch
+                id="edit-is-hod"
+                checked={editIsHod}
+                onCheckedChange={setEditIsHod}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="edit-is-active">Active</Label>
+                <p className="text-xs text-muted-foreground">Inactive members won't appear in task dropdowns</p>
+              </div>
+              <Switch
+                id="edit-is-active"
+                checked={editIsActive}
+                onCheckedChange={setEditIsActive}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditMember} disabled={editLoading || !editName.trim()}>
+              {editLoading ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Registered Users Section */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+            <UserCheck className="h-4 w-4" />
+            Registered Accounts ({userRoles.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {userRoles.length === 0 ? (
+            <div className="text-center py-4 text-muted-foreground">
+              No users have registered yet.
             </div>
           ) : (
             <div className="rounded-lg border overflow-hidden">
@@ -367,7 +478,7 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead className="font-semibold">User</TableHead>
-                    <TableHead className="font-semibold">Role</TableHead>
+                    <TableHead className="font-semibold">System Role</TableHead>
                     <TableHead className="text-right font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -428,51 +539,18 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
                               </Button>
                             </div>
                           ) : (
-                            <div className="flex gap-1 justify-end">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingUser(userRole.user_id);
-                                  setSelectedRole(userRole.role);
-                                }}
-                                disabled={isCurrentUser}
-                                title="Change role"
-                              >
-                                <Crown className="h-4 w-4" />
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    disabled={isCurrentUser}
-                                    title="Remove user"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Remove Team Member?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This will remove <strong className="capitalize">{displayName}</strong> from the team. 
-                                      Their tasks will remain but they won't be able to log in.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      onClick={() => handleDeleteUser(userRole)}
-                                    >
-                                      Remove
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingUser(userRole.user_id);
+                                setSelectedRole(userRole.role);
+                              }}
+                              disabled={isCurrentUser}
+                              title="Change system role"
+                            >
+                              <Crown className="h-4 w-4" />
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>
@@ -484,29 +562,6 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
           )}
         </CardContent>
       </Card>
-
-      {/* Unregistered Users */}
-      {unregisteredUsers.length > 0 && (
-        <Card className="border-dashed">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Team Members Not Yet Registered
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {unregisteredUsers.map(name => (
-                <Badge key={name} variant="outline" className="text-muted-foreground">
-                  {name}
-                </Badge>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-3">
-              These team members haven't signed up yet. Use "Add Member" to create accounts for them.
-            </p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Task, DELETE_PASSWORD, TEAM_MEMBERS } from '@/types/task';
+import { Task, DELETE_PASSWORD } from '@/types/task';
 import { isOverdue } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';

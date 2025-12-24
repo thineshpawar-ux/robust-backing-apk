@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -10,8 +9,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Task, TaskFormData, TEAM_MEMBERS } from '@/types/task';
+import { Task, TaskFormData } from '@/types/task';
 import { todayISO } from '@/lib/date-utils';
+import { useTeamMembers } from '@/hooks/useTeamMembers';
 
 interface TaskFormProps {
   editingTask: Task | null;
@@ -21,6 +21,9 @@ interface TaskFormProps {
 }
 
 export function TaskForm({ editingTask, onSubmit, onReset, taskCount }: TaskFormProps) {
+  const { teamMembers, loading: membersLoading } = useTeamMembers();
+  const activeMembers = teamMembers.filter(m => m.is_active && !m.is_hod);
+  
   const [formData, setFormData] = useState<TaskFormData>({
     title: '',
     owner: '',
@@ -84,13 +87,14 @@ export function TaskForm({ editingTask, onSubmit, onReset, taskCount }: TaskForm
             value={formData.owner}
             onValueChange={(value) => setFormData(prev => ({ ...prev, owner: value }))}
             required
+            disabled={membersLoading}
           >
             <SelectTrigger className="h-9">
-              <SelectValue placeholder="Select member" />
+              <SelectValue placeholder={membersLoading ? "Loading..." : "Select member"} />
             </SelectTrigger>
             <SelectContent>
-              {TEAM_MEMBERS.map(member => (
-                <SelectItem key={member} value={member}>{member}</SelectItem>
+              {activeMembers.map(member => (
+                <SelectItem key={member.id} value={member.name}>{member.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

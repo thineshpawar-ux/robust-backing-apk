@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Task, TEAM_MEMBERS } from '@/types/task';
+import { Task } from '@/types/task';
 import { todayISO, isOverdue, isDueToday, formatDate } from '@/lib/date-utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -73,8 +73,9 @@ export function HODDashboard({
     const overdue = tasks.filter(t => isOverdue(t.current_target_date, t.status) && !t.waiting_for_subtask).length;
     const pendingClosure = tasks.filter(t => t.closure_pending).length;
 
-    // Per-member stats - exclude blocked tasks from overdue count
-    const memberStats = TEAM_MEMBERS.map(member => {
+    // Per-member stats - derive members from actual tasks (dynamic list)
+    const uniqueOwners = [...new Set(tasks.map(t => t.owner))];
+    const memberStats = uniqueOwners.map(member => {
       const memberTasks = tasks.filter(t => t.owner === member);
       const memberTotal = memberTasks.length;
       const memberClosed = memberTasks.filter(t => t.status === 'closed').length;
