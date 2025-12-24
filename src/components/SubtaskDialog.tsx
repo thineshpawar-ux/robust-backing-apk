@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { TEAM_MEMBERS } from '@/types/task';
+import { useTeamMembers } from '@/hooks/useTeamMembers';
 import { todayISO } from '@/lib/date-utils';
 
 interface SubtaskDialogProps {
@@ -28,6 +28,9 @@ interface SubtaskDialogProps {
 }
 
 export function SubtaskDialog({ open, onOpenChange, parentTaskTitle, onSubmit }: SubtaskDialogProps) {
+  const { teamMembers, loading: membersLoading } = useTeamMembers();
+  const activeMembers = teamMembers.filter(m => m.is_active && !m.is_hod);
+  
   const [title, setTitle] = useState('');
   const [owner, setOwner] = useState('');
   const [targetDate, setTargetDate] = useState(todayISO());
@@ -66,13 +69,13 @@ export function SubtaskDialog({ open, onOpenChange, parentTaskTitle, onSubmit }:
           
           <div className="space-y-2">
             <Label htmlFor="subtask-owner">Assign To</Label>
-            <Select value={owner} onValueChange={setOwner} required>
+            <Select value={owner} onValueChange={setOwner} required disabled={membersLoading}>
               <SelectTrigger id="subtask-owner">
-                <SelectValue placeholder="Select team member" />
+                <SelectValue placeholder={membersLoading ? "Loading..." : "Select team member"} />
               </SelectTrigger>
               <SelectContent>
-                {TEAM_MEMBERS.map(member => (
-                  <SelectItem key={member} value={member}>{member}</SelectItem>
+                {activeMembers.map(member => (
+                  <SelectItem key={member.id} value={member.name}>{member.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

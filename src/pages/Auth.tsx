@@ -14,12 +14,15 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { TEAM_MEMBERS } from '@/types/task';
 import { supabase } from '@/integrations/supabase/client';
 import { KeyRound } from 'lucide-react';
 
-// All users including HOD
-const ALL_USERS = ['Hariharan', ...TEAM_MEMBERS] as const;
+interface TeamMember {
+  id: string;
+  name: string;
+  is_hod: boolean;
+  is_active: boolean;
+}
 
 const authSchema = z.object({
   name: z.string().trim().min(1, { message: 'Please select your name' }),
@@ -42,10 +45,26 @@ export default function Auth() {
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
   
   const { user, signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Fetch team members on mount
+  useEffect(() => {
+    const fetchMembers = async () => {
+      const { data } = await supabase
+        .from('team_members')
+        .select('id, name, is_hod, is_active')
+        .eq('is_active', true)
+        .order('name');
+      setTeamMembers(data || []);
+      setMembersLoading(false);
+    };
+    fetchMembers();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -261,14 +280,14 @@ export default function Auth() {
               <Label htmlFor="name" className="text-xs text-muted-foreground">
                 Name
               </Label>
-              <Select value={name} onValueChange={setName}>
+              <Select value={name} onValueChange={setName} disabled={membersLoading}>
                 <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Select your name" />
+                  <SelectValue placeholder={membersLoading ? "Loading..." : "Select your name"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {ALL_USERS.map(user => (
-                    <SelectItem key={user} value={user}>
-                      {user} {user === 'Hariharan' && '(HOD)'}
+                  {teamMembers.map(member => (
+                    <SelectItem key={member.id} value={member.name}>
+                      {member.name} {member.is_hod && '(HOD)'}
                     </SelectItem>
                   ))}
                 </SelectContent>
