@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import { viteSingleFile } from "vite-plugin-singlefile";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
@@ -9,7 +10,12 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [
+    react(),
+    mode === "development" && componentTagger(),
+    // Build a single, copy-pasteable HTML file: `npm run build -- --mode singlefile`
+    mode === "singlefile" && viteSingleFile({ deleteInlinedFiles: true }),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
