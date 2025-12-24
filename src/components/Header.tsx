@@ -25,8 +25,8 @@ export function Header({ connected, activeView, onViewChange, userEmail, current
       
       <div className="flex items-center gap-2 flex-wrap justify-end">
         {userEmail && (
-          <span className="text-xs text-muted-foreground hidden sm:inline">
-            {userEmail}
+          <span className="text-xs text-muted-foreground hidden sm:inline capitalize font-medium">
+            {userEmail.split('@')[0]} {isHOD && '(HOD)'}
           </span>
         )}
         

@@ -77,7 +77,7 @@ const Index = () => {
     return result;
   };
 
-  const currentUserIsHOD = isHOD(user?.id);
+  const currentUserIsHOD = isHOD(user?.id, user?.email);
 
   return (
     <div className="min-h-screen bg-background">
@@ -87,7 +87,7 @@ const Index = () => {
           activeView={activeView}
           onViewChange={setActiveView}
           userEmail={user?.email}
-          currentUser={user?.email?.split('@')[0] || ''}
+          currentUser={user?.email?.split('@')[0]?.charAt(0).toUpperCase() + (user?.email?.split('@')[0]?.slice(1) || '')}
           onSignOut={handleSignOut}
           isHOD={currentUserIsHOD}
         />

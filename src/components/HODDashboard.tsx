@@ -47,7 +47,7 @@ export function HODDashboard({
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [subtaskParentTask, setSubtaskParentTask] = useState<Task | null>(null);
   const { isHOD } = useUserRoles();
-  const userIsHOD = isHOD(currentUserId);
+  const userIsHOD = isHOD(currentUserId, currentUserEmail);
 
   const stats = useMemo(() => {
     const total = tasks.length;
