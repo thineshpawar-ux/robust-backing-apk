@@ -285,19 +285,18 @@ export function HODDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[250px]">
+            <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                   <Pie
                     data={statusChartData}
                     cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={90}
+                    cy="45%"
+                    innerRadius={50}
+                    outerRadius={80}
                     paddingAngle={3}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    labelLine={false}
+                    label={false}
                   >
                     {statusChartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} strokeWidth={0} />
@@ -310,12 +309,13 @@ export function HODDashboard({
                       borderRadius: '8px',
                       color: 'hsl(var(--foreground))'
                     }}
-                    formatter={(value: number) => [value, 'Tasks']}
+                    formatter={(value: number, name: string) => [value, name]}
                   />
                   <Legend 
                     verticalAlign="bottom" 
-                    height={36}
-                    formatter={(value) => <span className="text-foreground text-sm">{value}</span>}
+                    align="center"
+                    wrapperStyle={{ paddingTop: '10px' }}
+                    formatter={(value) => <span className="text-foreground text-xs">{value}</span>}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -332,17 +332,22 @@ export function HODDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[250px]">
+            <div className="h-[280px]">
               {memberChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={memberChartData} layout="vertical" barCategoryGap="20%">
+                  <BarChart 
+                    data={memberChartData} 
+                    layout="vertical" 
+                    barCategoryGap="15%"
+                    margin={{ top: 30, right: 20, bottom: 10, left: 10 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="hsl(var(--border))" />
-                    <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+                    <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
                     <YAxis 
                       type="category" 
                       dataKey="name" 
-                      width={70}
-                      tick={{ fill: 'hsl(var(--foreground))', fontSize: 12 }}
+                      width={60}
+                      tick={{ fill: 'hsl(var(--foreground))', fontSize: 11 }}
                     />
                     <Tooltip 
                       contentStyle={{ 
@@ -353,15 +358,16 @@ export function HODDashboard({
                       }}
                       cursor={{ fill: 'hsl(var(--muted) / 0.3)' }}
                     />
+                    <Legend 
+                      verticalAlign="top" 
+                      align="center"
+                      wrapperStyle={{ paddingBottom: '5px' }}
+                      formatter={(value) => <span className="text-foreground text-xs">{value}</span>}
+                    />
                     <Bar dataKey="completed" stackId="a" fill={COLORS.completed} name="Completed" radius={[0, 0, 0, 0]} />
                     <Bar dataKey="open" stackId="a" fill={COLORS.open} name="Open" radius={[0, 0, 0, 0]} />
                     <Bar dataKey="pending" stackId="a" fill={COLORS.pending} name="Pending" radius={[0, 0, 0, 0]} />
                     <Bar dataKey="overdue" stackId="a" fill={COLORS.overdue} name="Overdue" radius={[0, 4, 4, 0]} />
-                    <Legend 
-                      verticalAlign="top" 
-                      height={36}
-                      formatter={(value) => <span className="text-foreground text-sm">{value}</span>}
-                    />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
