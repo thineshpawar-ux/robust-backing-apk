@@ -73,7 +73,8 @@ export function TeamView({
         closure_comment: null,
         closure_requested_by: null,
         closure_approved_by: null,
-        parent_task_id: null
+        parent_task_id: null,
+        waiting_for_subtask: false
       });
     }
   };

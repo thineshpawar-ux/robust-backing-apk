@@ -36,7 +36,8 @@ export function useTasks() {
         closure_comment: (t as any).closure_comment,
         closure_requested_by: (t as any).closure_requested_by,
         closure_approved_by: (t as any).closure_approved_by,
-        parent_task_id: (t as any).parent_task_id || null
+        parent_task_id: (t as any).parent_task_id || null,
+        waiting_for_subtask: (t as any).waiting_for_subtask || false
       }));
       
       setTasks(mappedTasks);
@@ -71,7 +72,8 @@ export function useTasks() {
               closure_comment: newTask.closure_comment,
               closure_requested_by: newTask.closure_requested_by,
               closure_approved_by: newTask.closure_approved_by,
-              parent_task_id: newTask.parent_task_id || null
+              parent_task_id: newTask.parent_task_id || null,
+              waiting_for_subtask: newTask.waiting_for_subtask || false
             };
             setTasks(prev => [mappedTask, ...prev]);
             toast({
@@ -87,7 +89,8 @@ export function useTasks() {
               closure_comment: updated.closure_comment,
               closure_requested_by: updated.closure_requested_by,
               closure_approved_by: updated.closure_approved_by,
-              parent_task_id: updated.parent_task_id || null
+              parent_task_id: updated.parent_task_id || null,
+              waiting_for_subtask: updated.waiting_for_subtask || false
             };
             setTasks(prev => prev.map(t => t.id === mappedTask.id ? mappedTask : t));
           } else if (payload.eventType === 'DELETE') {

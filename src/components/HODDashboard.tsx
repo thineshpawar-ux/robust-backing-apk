@@ -63,21 +63,27 @@ export function HODDashboard({
     const total = tasks.length;
     const closed = tasks.filter(t => t.status === 'closed').length;
     const open = tasks.filter(t => t.status === 'open').length;
+    const blocked = tasks.filter(t => t.waiting_for_subtask).length;
     const exec = total ? Math.round((closed / total) * 100) : 0;
 
-    const dueToday = tasks.filter(t => isDueToday(t.current_target_date, t.status)).length;
-    const overdue = tasks.filter(t => isOverdue(t.current_target_date, t.status)).length;
+    // Exclude blocked tasks from overdue/due today counts
+    const dueToday = tasks.filter(t => isDueToday(t.current_target_date, t.status) && !t.waiting_for_subtask).length;
+    const overdue = tasks.filter(t => isOverdue(t.current_target_date, t.status) && !t.waiting_for_subtask).length;
     const pendingClosure = tasks.filter(t => t.closure_pending).length;
 
-    // Per-member stats
+    // Per-member stats - exclude blocked tasks from overdue count
     const memberStats = TEAM_MEMBERS.map(member => {
       const memberTasks = tasks.filter(t => t.owner === member);
       const memberTotal = memberTasks.length;
       const memberClosed = memberTasks.filter(t => t.status === 'closed').length;
-      const memberOpen = memberTasks.filter(t => t.status === 'open').length;
-      const memberOverdue = memberTasks.filter(t => isOverdue(t.current_target_date, t.status)).length;
+      const memberOpen = memberTasks.filter(t => t.status === 'open' && !t.waiting_for_subtask).length;
+      const memberBlocked = memberTasks.filter(t => t.waiting_for_subtask).length;
+      // Exclude blocked tasks from overdue count - they don't affect owner's performance
+      const memberOverdue = memberTasks.filter(t => isOverdue(t.current_target_date, t.status) && !t.waiting_for_subtask).length;
       const memberPendingClosure = memberTasks.filter(t => t.closure_pending).length;
-      const memberExec = memberTotal ? Math.round((memberClosed / memberTotal) * 100) : 0;
+      // Execution rate: closed / (total - blocked) to be fair
+      const effectiveTotal = memberTotal - memberBlocked;
+      const memberExec = effectiveTotal > 0 ? Math.round((memberClosed / effectiveTotal) * 100) : (memberTotal === 0 ? 0 : 100);
       
       let dateChanges = 0;
       memberTasks.forEach(t => {
@@ -91,6 +97,7 @@ export function HODDashboard({
         total: memberTotal,
         open: memberOpen,
         closed: memberClosed,
+        blocked: memberBlocked,
         overdue: memberOverdue,
         pendingClosure: memberPendingClosure,
         exec: memberExec,
@@ -661,15 +668,16 @@ export function HODDashboard({
                 </TableHeader>
                 <TableBody>
                   {tasks.slice(0, 50).map(task => {
-                    const taskOverdue = isOverdue(task.current_target_date, task.status);
-                    const taskDueToday = isDueToday(task.current_target_date, task.status);
+                    const taskOverdue = isOverdue(task.current_target_date, task.status) && !task.waiting_for_subtask;
+                    const taskDueToday = isDueToday(task.current_target_date, task.status) && !task.waiting_for_subtask;
                     const dateMoves = (task.target_date_history?.length || 1) - 1;
                     
                     return (
                       <TableRow key={task.id} className={cn(
                         "bg-card",
-                        taskOverdue && "bg-destructive/5",
-                        taskDueToday && "bg-amber-500/5"
+                        task.waiting_for_subtask && "bg-amber-500/5",
+                        taskOverdue && !task.waiting_for_subtask && "bg-destructive/5",
+                        taskDueToday && !task.waiting_for_subtask && "bg-amber-500/5"
                       )}>
                         <TableCell className="font-medium max-w-[250px] truncate">
                           {task.parent_task_id && (
@@ -690,6 +698,10 @@ export function HODDashboard({
                           {task.status === 'closed' ? (
                             <Badge variant="secondary" className="bg-[hsl(var(--chart-2))/0.1] text-[hsl(var(--chart-2))]">
                               Closed
+                            </Badge>
+                          ) : task.waiting_for_subtask ? (
+                            <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                              Blocked
                             </Badge>
                           ) : task.closure_pending ? (
                             <Badge variant="secondary" className="bg-[hsl(var(--chart-3))/0.1] text-[hsl(var(--chart-3))]">
