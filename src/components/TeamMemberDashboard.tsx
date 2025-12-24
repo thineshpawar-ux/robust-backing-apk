@@ -19,6 +19,7 @@ import {
   Pie,
   Cell,
   Tooltip,
+  Legend,
 } from 'recharts';
 import {
   Table,
@@ -229,19 +230,18 @@ export function TeamMemberDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[200px]">
+            <div className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart margin={{ top: 10, right: 10, bottom: 40, left: 10 }}>
                   <Pie
                     data={statusChartData}
                     cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={70}
+                    cy="40%"
+                    innerRadius={35}
+                    outerRadius={60}
                     paddingAngle={3}
                     dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                    labelLine={false}
+                    label={false}
                   >
                     {statusChartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} strokeWidth={0} />
@@ -254,6 +254,13 @@ export function TeamMemberDashboard({
                       borderRadius: '8px',
                       color: 'hsl(var(--foreground))'
                     }}
+                    formatter={(value: number, name: string) => [value, name]}
+                  />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    align="center"
+                    wrapperStyle={{ paddingTop: '10px' }}
+                    formatter={(value) => <span className="text-foreground text-xs">{value}</span>}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -270,20 +277,21 @@ export function TeamMemberDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[200px]">
+            <div className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={weeklyData}>
+                <BarChart data={weeklyData} margin={{ top: 10, right: 10, bottom: 10, left: 0 }}>
                   <XAxis 
                     dataKey="name" 
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                   />
                   <YAxis 
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                     allowDecimals={false}
+                    width={30}
                   />
                   <Tooltip 
                     contentStyle={{ 
