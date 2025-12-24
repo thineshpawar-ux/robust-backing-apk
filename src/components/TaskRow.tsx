@@ -80,6 +80,13 @@ export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete,
             </div>
           )}
           
+          {/* Rejection Comment from HOD */}
+          {task.closure_rejection_comment && !task.closure_pending && task.status === 'open' && (
+            <div className="text-xs text-destructive bg-destructive/10 p-2 rounded border border-destructive/30">
+              <span className="font-semibold">⚠️ Closure Rejected:</span> "{task.closure_rejection_comment}"
+            </div>
+          )}
+          
           {/* Closure Comment if pending */}
           {task.closure_pending && task.closure_comment && (
             <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded italic">
