@@ -49,21 +49,22 @@ export function useAuth() {
   };
 
   const signOut = async () => {
+    // Use scope: 'local' to only clear local session without server call
+    // This prevents errors when session is already expired on server
     try {
-      const { error } = await supabase.auth.signOut();
-      // Even if signOut fails (e.g., session already expired), clear local state
-      if (error) {
-        console.warn('Sign out warning:', error.message);
-      }
-      setSession(null);
-      setUser(null);
-      return { error: null };
+      await supabase.auth.signOut({ scope: 'local' });
     } catch (err) {
-      // Force clear state on any error
-      setSession(null);
-      setUser(null);
-      return { error: null };
+      console.warn('Sign out error:', err);
     }
+    // Always clear local state
+    setSession(null);
+    setUser(null);
+    return { error: null };
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    return { error };
   };
 
   return {
@@ -72,6 +73,7 @@ export function useAuth() {
     loading,
     signUp,
     signIn,
-    signOut
+    signOut,
+    updatePassword
   };
 }
