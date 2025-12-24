@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Task, TEAM_MEMBERS } from '@/types/task';
-import { todayISO, isOverdue, isDueToday } from '@/lib/date-utils';
+import { todayISO, isOverdue, isDueToday, formatDate } from '@/lib/date-utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Check, X, Clock, AlertTriangle, CheckCircle2, TrendingUp, Users, Calendar, Target, ShieldAlert, FileCheck, Plus } from 'lucide-react';
+import { 
+  Check, X, Clock, AlertTriangle, CheckCircle2, TrendingUp, Users, Calendar, 
+  Target, ShieldAlert, FileCheck, Plus, ListTodo, ArrowRight, Zap
+} from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -22,6 +25,14 @@ import {
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import { SubtaskDialog } from './SubtaskDialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 interface HODDashboardProps {
   tasks: Task[];
@@ -44,7 +55,6 @@ export function HODDashboard({
   onRejectClosure,
   onAddSubtask 
 }: HODDashboardProps) {
-  const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [subtaskParentTask, setSubtaskParentTask] = useState<Task | null>(null);
   const { isHOD } = useUserRoles();
   const userIsHOD = isHOD(currentUserId, currentUserEmail);
@@ -118,7 +128,7 @@ export function HODDashboard({
     { name: 'Completed', value: stats.closed, fill: 'hsl(var(--chart-2))' },
     { name: 'Open', value: stats.open - stats.overdue - stats.pendingClosure, fill: 'hsl(var(--chart-1))' },
     { name: 'Overdue', value: stats.overdue, fill: 'hsl(var(--destructive))' },
-    { name: 'Pending Closure', value: stats.pendingClosure, fill: 'hsl(var(--chart-3))' },
+    { name: 'Pending', value: stats.pendingClosure, fill: 'hsl(var(--chart-3))' },
   ].filter(d => d.value > 0);
 
   // Chart data for member performance
@@ -138,11 +148,39 @@ export function HODDashboard({
     overdue: 'hsl(var(--destructive))',
   };
 
+  const totalPendingApprovals = stats.pendingDateApprovals.length + stats.pendingClosureApprovals.length;
+
   return (
     <div className="space-y-6">
-      {/* KPI Cards Row */}
+      {/* Quick Action Banner - Pending Approvals */}
+      {totalPendingApprovals > 0 && (
+        <Card className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-red-500/10 border-amber-500/30">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <Zap className="h-6 w-6 text-amber-500" />
+                </div>
+                <div>
+                  <div className="font-semibold text-foreground text-lg">
+                    {totalPendingApprovals} Approval{totalPendingApprovals > 1 ? 's' : ''} Pending
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {stats.pendingDateApprovals.length} date change • {stats.pendingClosureApprovals.length} closure
+                  </div>
+                </div>
+              </div>
+              <a href="#approvals" className="text-sm font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1 hover:underline">
+                Review Now <ArrowRight className="h-4 w-4" />
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* KPI Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        <Card className="border-l-4 border-l-primary">
+        <Card className="border-l-4 border-l-primary bg-gradient-to-br from-primary/5 to-transparent">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
               <Target className="h-3 w-3" />
@@ -208,7 +246,7 @@ export function HODDashboard({
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-primary">
+        <Card className="border-l-4 border-l-primary bg-gradient-to-br from-primary/5 to-transparent">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
               <TrendingUp className="h-3 w-3" />
@@ -231,15 +269,15 @@ export function HODDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[280px]">
+            <div className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={statusChartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
+                    innerRadius={55}
+                    outerRadius={90}
                     paddingAngle={3}
                     dataKey="value"
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
@@ -278,7 +316,7 @@ export function HODDashboard({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[280px]">
+            <div className="h-[250px]">
               {memberChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={memberChartData} layout="vertical" barCategoryGap="20%">
@@ -320,27 +358,227 @@ export function HODDashboard({
         </Card>
       </div>
 
-      {/* Member Performance Cards */}
+      {/* Pending Approvals Section */}
+      <div id="approvals" className="scroll-mt-4 space-y-4">
+        {/* Date Change Approvals */}
+        {stats.pendingDateApprovals.length > 0 && (
+          <Card className="border-amber-500/50 bg-amber-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Date Change Requests ({stats.pendingDateApprovals.length})
+                {!userIsHOD && (
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    <ShieldAlert className="h-3 w-3 mr-1" />
+                    HOD Only
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-semibold">Task</TableHead>
+                      <TableHead className="font-semibold">Owner</TableHead>
+                      <TableHead className="font-semibold">Current → New</TableHead>
+                      <TableHead className="font-semibold">Reason</TableHead>
+                      <TableHead className="text-right font-semibold">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stats.pendingDateApprovals.map(task => (
+                      <TableRow key={task.id} className="bg-card">
+                        <TableCell className="font-medium max-w-[200px] truncate">{task.title}</TableCell>
+                        <TableCell>{task.owner}</TableCell>
+                        <TableCell>
+                          <span className="tabular-nums">{formatDate(task.current_target_date)}</span>
+                          <ArrowRight className="h-3 w-3 inline mx-1 text-muted-foreground" />
+                          <span className="text-amber-600 dark:text-amber-400 font-medium tabular-nums">
+                            {formatDate(task.date_change_requested_date || '')}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground italic max-w-[150px] truncate">
+                          {task.date_change_reason || '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end">
+                            <TooltipProvider>
+                              <UITooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0 text-[hsl(var(--chart-2))] hover:bg-[hsl(var(--chart-2))/0.1]"
+                                      onClick={() => handleApproveDateChange(task.id)}
+                                      disabled={!userIsHOD}
+                                    >
+                                      <Check className="h-4 w-4" />
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {userIsHOD ? 'Approve' : 'Only HOD can approve'}
+                                </TooltipContent>
+                              </UITooltip>
+                            </TooltipProvider>
+                            <TooltipProvider>
+                              <UITooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                                      onClick={() => onRejectDateChange?.(task.id)}
+                                      disabled={!userIsHOD}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {userIsHOD ? 'Reject' : 'Only HOD can reject'}
+                                </TooltipContent>
+                              </UITooltip>
+                            </TooltipProvider>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Closure Approvals */}
+        {stats.pendingClosureApprovals.length > 0 && (
+          <Card className="border-[hsl(var(--chart-3))] bg-[hsl(var(--chart-3))/0.05]">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium uppercase tracking-wide text-[hsl(var(--chart-3))] flex items-center gap-2">
+                <FileCheck className="h-4 w-4" />
+                Closure Requests ({stats.pendingClosureApprovals.length})
+                {!userIsHOD && (
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    <ShieldAlert className="h-3 w-3 mr-1" />
+                    HOD Only
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-semibold">Task</TableHead>
+                      <TableHead className="font-semibold">Owner</TableHead>
+                      <TableHead className="font-semibold">Requested By</TableHead>
+                      <TableHead className="font-semibold">Comment</TableHead>
+                      <TableHead className="text-right font-semibold">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stats.pendingClosureApprovals.map(task => (
+                      <TableRow key={task.id} className="bg-card">
+                        <TableCell className="font-medium max-w-[200px] truncate">{task.title}</TableCell>
+                        <TableCell>{task.owner}</TableCell>
+                        <TableCell>{task.closure_requested_by}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground italic max-w-[150px] truncate">
+                          {task.closure_comment || '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end">
+                            {userIsHOD && (
+                              <TooltipProvider>
+                                <UITooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0 text-primary hover:bg-primary/10"
+                                      onClick={() => setSubtaskParentTask(task)}
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Add Subtask</TooltipContent>
+                                </UITooltip>
+                              </TooltipProvider>
+                            )}
+                            <TooltipProvider>
+                              <UITooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0 text-[hsl(var(--chart-2))] hover:bg-[hsl(var(--chart-2))/0.1]"
+                                      onClick={() => handleApproveClosure(task.id)}
+                                      disabled={!userIsHOD}
+                                    >
+                                      <Check className="h-4 w-4" />
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {userIsHOD ? 'Approve' : 'Only HOD can approve'}
+                                </TooltipContent>
+                              </UITooltip>
+                            </TooltipProvider>
+                            <TooltipProvider>
+                              <UITooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                                      onClick={() => onRejectClosure?.(task.id)}
+                                      disabled={!userIsHOD}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {userIsHOD ? 'Reject' : 'Only HOD can reject'}
+                                </TooltipContent>
+                              </UITooltip>
+                            </TooltipProvider>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Team Performance Cards */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
             <Users className="h-4 w-4" />
-            Member Performance Details
+            Individual Performance
           </CardTitle>
         </CardHeader>
         <CardContent>
           {stats.memberStats.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">No tasks assigned</p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {stats.memberStats.map(member => (
                 <Card 
                   key={member.name}
-                  className={cn(
-                    "cursor-pointer transition-all hover:shadow-md border",
-                    selectedMember === member.name && "ring-2 ring-primary"
-                  )}
-                  onClick={() => setSelectedMember(selectedMember === member.name ? null : member.name)}
+                  className="border hover:shadow-md transition-all"
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-3">
@@ -354,44 +592,42 @@ export function HODDashboard({
                     </div>
                     
                     {/* Execution Progress Bar */}
-                    <div className="h-2 bg-muted rounded-full overflow-hidden mb-4">
+                    <div className="h-2 bg-muted rounded-full overflow-hidden mb-3">
                       <div 
-                        className="h-full bg-gradient-to-r from-[hsl(var(--chart-2))] to-accent transition-all duration-500 ease-out"
+                        className="h-full bg-gradient-to-r from-[hsl(var(--chart-2))] to-primary transition-all duration-500 ease-out"
                         style={{ width: `${member.exec}%` }}
                       />
                     </div>
 
-                    <div className="grid grid-cols-5 gap-2 text-center">
-                      <div className="space-y-1">
-                        <div className="text-lg font-bold text-foreground">{member.total}</div>
-                        <div className="text-xs text-muted-foreground">Total</div>
+                    <div className="grid grid-cols-5 gap-1 text-center">
+                      <div>
+                        <div className="text-sm font-bold text-foreground">{member.total}</div>
+                        <div className="text-[10px] text-muted-foreground">Total</div>
                       </div>
-                      <div className="space-y-1">
-                        <div className="text-lg font-bold text-[hsl(var(--chart-2))]">{member.closed}</div>
-                        <div className="text-xs text-muted-foreground">Done</div>
+                      <div>
+                        <div className="text-sm font-bold text-[hsl(var(--chart-2))]">{member.closed}</div>
+                        <div className="text-[10px] text-muted-foreground">Done</div>
                       </div>
-                      <div className="space-y-1">
-                        <div className="text-lg font-bold text-[hsl(var(--chart-1))]">{member.open}</div>
-                        <div className="text-xs text-muted-foreground">Open</div>
+                      <div>
+                        <div className="text-sm font-bold text-[hsl(var(--chart-1))]">{member.open}</div>
+                        <div className="text-[10px] text-muted-foreground">Open</div>
                       </div>
-                      <div className="space-y-1">
-                        <div className="text-lg font-bold text-[hsl(var(--chart-3))]">{member.pendingClosure}</div>
-                        <div className="text-xs text-muted-foreground">Pending</div>
+                      <div>
+                        <div className="text-sm font-bold text-[hsl(var(--chart-3))]">{member.pendingClosure}</div>
+                        <div className="text-[10px] text-muted-foreground">Pend</div>
                       </div>
-                      <div className="space-y-1">
-                        <div className="text-lg font-bold text-destructive">{member.overdue}</div>
-                        <div className="text-xs text-muted-foreground">Late</div>
+                      <div>
+                        <div className="text-sm font-bold text-destructive">{member.overdue}</div>
+                        <div className="text-[10px] text-muted-foreground">Late</div>
                       </div>
                     </div>
 
                     {member.dateChanges > 0 && (
-                      <div className="mt-3 pt-3 border-t border-border">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Date Changes</span>
-                          <Badge variant={member.dateChanges > 2 ? "destructive" : "secondary"} className="text-xs">
-                            {member.dateChanges}
-                          </Badge>
-                        </div>
+                      <div className="mt-2 pt-2 border-t border-border flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Date Changes</span>
+                        <Badge variant={member.dateChanges > 2 ? "destructive" : "secondary"} className="text-xs h-5">
+                          {member.dateChanges}
+                        </Badge>
                       </div>
                     )}
                   </CardContent>
@@ -402,213 +638,100 @@ export function HODDashboard({
         </CardContent>
       </Card>
 
-      {/* Pending Closure Approvals */}
-      {stats.pendingClosureApprovals.length > 0 && (
-        <Card className="border-[hsl(var(--chart-3))] bg-[hsl(var(--chart-3))/0.05]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-wide text-[hsl(var(--chart-3))] flex items-center gap-2">
-              <FileCheck className="h-4 w-4" />
-              Pending Closure Approvals ({stats.pendingClosureApprovals.length})
-              {!userIsHOD && (
-                <Badge variant="secondary" className="ml-2 text-xs">
-                  <ShieldAlert className="h-3 w-3 mr-1" />
-                  HOD Only
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {stats.pendingClosureApprovals.map(task => (
-                <div
-                  key={task.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card rounded-lg border gap-4"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-foreground truncate">{task.title}</div>
-                    <div className="text-sm text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2">
-                      <span className="font-medium">{task.owner}</span>
-                      <span>•</span>
-                      <span>Requested by: {task.closure_requested_by}</span>
-                    </div>
-                    {task.closure_comment && (
-                      <div className="text-xs text-muted-foreground mt-2 italic bg-muted/50 p-2 rounded">
-                        "{task.closure_comment}"
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    {userIsHOD && (
-                      <TooltipProvider>
-                        <UITooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-primary border-primary hover:bg-primary/10"
-                              onClick={() => setSubtaskParentTask(task)}
-                            >
-                              <Plus className="h-4 w-4 mr-1" />
-                              Add Subtask
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Add a subtask instead of closing</p>
-                          </TooltipContent>
-                        </UITooltip>
-                      </TooltipProvider>
-                    )}
-                    <TooltipProvider>
-                      <UITooltip>
-                        <TooltipTrigger asChild>
-                          <span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-[hsl(var(--chart-2))] border-[hsl(var(--chart-2))] hover:bg-[hsl(var(--chart-2))/0.1]"
-                              onClick={() => handleApproveClosure(task.id)}
-                              disabled={!userIsHOD}
-                            >
-                              <Check className="h-4 w-4 mr-1" />
-                              Approve
-                            </Button>
+      {/* All Tasks Table */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+            <ListTodo className="h-4 w-4" />
+            All Tasks ({tasks.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border overflow-hidden">
+            <div className="max-h-[400px] overflow-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-muted">
+                  <TableRow>
+                    <TableHead className="font-semibold">Task</TableHead>
+                    <TableHead className="font-semibold">Owner</TableHead>
+                    <TableHead className="font-semibold">Target Date</TableHead>
+                    <TableHead className="font-semibold">Status</TableHead>
+                    <TableHead className="font-semibold text-center">Date Moves</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tasks.slice(0, 50).map(task => {
+                    const taskOverdue = isOverdue(task.current_target_date, task.status);
+                    const taskDueToday = isDueToday(task.current_target_date, task.status);
+                    const dateMoves = (task.target_date_history?.length || 1) - 1;
+                    
+                    return (
+                      <TableRow key={task.id} className={cn(
+                        "bg-card",
+                        taskOverdue && "bg-destructive/5",
+                        taskDueToday && "bg-amber-500/5"
+                      )}>
+                        <TableCell className="font-medium max-w-[250px] truncate">
+                          {task.parent_task_id && (
+                            <span className="text-xs text-muted-foreground mr-1">↳</span>
+                          )}
+                          {task.title}
+                        </TableCell>
+                        <TableCell>{task.owner}</TableCell>
+                        <TableCell className="tabular-nums">
+                          <span className={cn(
+                            taskOverdue && "text-destructive font-medium",
+                            taskDueToday && "text-amber-600 dark:text-amber-400 font-medium"
+                          )}>
+                            {formatDate(task.current_target_date)}
                           </span>
-                        </TooltipTrigger>
-                        {!userIsHOD && (
-                          <TooltipContent>
-                            <p>Only HOD can approve closures</p>
-                          </TooltipContent>
-                        )}
-                      </UITooltip>
-                    </TooltipProvider>
-                    <TooltipProvider>
-                      <UITooltip>
-                        <TooltipTrigger asChild>
-                          <span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-destructive border-destructive hover:bg-destructive/10"
-                              onClick={() => onRejectClosure?.(task.id)}
-                              disabled={!userIsHOD}
-                            >
-                              <X className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
-                          </span>
-                        </TooltipTrigger>
-                        {!userIsHOD && (
-                          <TooltipContent>
-                            <p>Only HOD can reject closures</p>
-                          </TooltipContent>
-                        )}
-                      </UITooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
-              ))}
+                        </TableCell>
+                        <TableCell>
+                          {task.status === 'closed' ? (
+                            <Badge variant="secondary" className="bg-[hsl(var(--chart-2))/0.1] text-[hsl(var(--chart-2))]">
+                              Closed
+                            </Badge>
+                          ) : task.closure_pending ? (
+                            <Badge variant="secondary" className="bg-[hsl(var(--chart-3))/0.1] text-[hsl(var(--chart-3))]">
+                              Pending Closure
+                            </Badge>
+                          ) : task.date_change_pending ? (
+                            <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                              Date Change
+                            </Badge>
+                          ) : taskOverdue ? (
+                            <Badge variant="destructive">Overdue</Badge>
+                          ) : taskDueToday ? (
+                            <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                              Due Today
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">Open</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {dateMoves > 0 ? (
+                            <Badge variant={dateMoves > 2 ? "destructive" : "secondary"} className="text-xs">
+                              {dateMoves}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Pending Date Change Approvals */}
-      {stats.pendingDateApprovals.length > 0 && (
-        <Card className="border-amber-500/50 bg-amber-500/5">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400 flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Pending Date Change Approvals ({stats.pendingDateApprovals.length})
-              {!userIsHOD && (
-                <Badge variant="secondary" className="ml-2 text-xs">
-                  <ShieldAlert className="h-3 w-3 mr-1" />
-                  HOD Only
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {stats.pendingDateApprovals.map(task => (
-                <div
-                  key={task.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-card rounded-lg border gap-4"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-foreground truncate">{task.title}</div>
-                    <div className="text-sm text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2">
-                      <span className="font-medium">{task.owner}</span>
-                      <span>•</span>
-                      <span className="tabular-nums">{task.current_target_date}</span>
-                      {task.date_change_requested_date && (
-                        <>
-                          <span>→</span>
-                          <span className="text-amber-600 dark:text-amber-400 font-medium tabular-nums">
-                            {task.date_change_requested_date}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    {task.date_change_reason && (
-                      <div className="text-xs text-muted-foreground mt-2 italic bg-muted/50 p-2 rounded">
-                        "{task.date_change_reason}"
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <TooltipProvider>
-                      <UITooltip>
-                        <TooltipTrigger asChild>
-                          <span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-[hsl(var(--chart-2))] border-[hsl(var(--chart-2))] hover:bg-[hsl(var(--chart-2))/0.1]"
-                              onClick={() => handleApproveDateChange(task.id)}
-                              disabled={!userIsHOD}
-                            >
-                              <Check className="h-4 w-4 mr-1" />
-                              Approve
-                            </Button>
-                          </span>
-                        </TooltipTrigger>
-                        {!userIsHOD && (
-                          <TooltipContent>
-                            <p>Only HOD can approve date changes</p>
-                          </TooltipContent>
-                        )}
-                      </UITooltip>
-                    </TooltipProvider>
-                    <TooltipProvider>
-                      <UITooltip>
-                        <TooltipTrigger asChild>
-                          <span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-destructive border-destructive hover:bg-destructive/10"
-                              onClick={() => onRejectDateChange?.(task.id)}
-                              disabled={!userIsHOD}
-                            >
-                              <X className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
-                          </span>
-                        </TooltipTrigger>
-                        {!userIsHOD && (
-                          <TooltipContent>
-                            <p>Only HOD can reject date changes</p>
-                          </TooltipContent>
-                        )}
-                      </UITooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+          {tasks.length > 50 && (
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              Showing 50 of {tasks.length} tasks
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Subtask Dialog */}
       <SubtaskDialog
