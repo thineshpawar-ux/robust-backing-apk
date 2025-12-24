@@ -3,7 +3,7 @@ import { isOverdue } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Clock, CheckCircle2, AlertTriangle, Hourglass, CornerDownRight } from 'lucide-react';
+import { Clock, CheckCircle2, AlertTriangle, Hourglass, CornerDownRight, Ban } from 'lucide-react';
 
 interface TaskRowProps {
   task: Task;
@@ -15,11 +15,11 @@ interface TaskRowProps {
 }
 
 export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete, isSubtask }: TaskRowProps) {
-  const overdue = isOverdue(task.current_target_date, task.status);
+  const overdue = isOverdue(task.current_target_date, task.status) && !task.waiting_for_subtask;
   const dateChanges = (task.target_date_history?.length || 1) - 1;
 
-  // Any team member can request closure for open tasks
-  const canRequestClosure = task.status === 'open' && !task.closure_pending;
+  // Any team member can request closure for open tasks (unless blocked by subtask)
+  const canRequestClosure = task.status === 'open' && !task.closure_pending && !task.waiting_for_subtask;
 
   const handleDelete = () => {
     const pwd = prompt('Enter delete password to remove this task:');
@@ -31,6 +31,7 @@ export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete,
   };
 
   const getStatusIcon = () => {
+    if (task.waiting_for_subtask) return <Ban className="h-4 w-4 text-amber-500" />;
     if (task.closure_pending) return <Hourglass className="h-4 w-4 text-[hsl(var(--chart-3))]" />;
     if (task.status === 'closed') return <CheckCircle2 className="h-4 w-4 text-[hsl(var(--chart-2))]" />;
     if (overdue) return <AlertTriangle className="h-4 w-4 text-destructive" />;
@@ -40,8 +41,9 @@ export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete,
   return (
     <div className={cn(
       "rounded-lg border bg-card p-4 mb-3 animate-fade-in transition-all hover:shadow-md",
-      task.closure_pending && "border-[hsl(var(--chart-3))] bg-[hsl(var(--chart-3))/0.03]",
-      overdue && !task.closure_pending && task.status === 'open' && "border-destructive/50 bg-destructive/5",
+      task.waiting_for_subtask && "border-amber-500/50 bg-amber-500/5",
+      task.closure_pending && !task.waiting_for_subtask && "border-[hsl(var(--chart-3))] bg-[hsl(var(--chart-3))/0.03]",
+      overdue && !task.closure_pending && !task.waiting_for_subtask && task.status === 'open' && "border-destructive/50 bg-destructive/5",
       task.status === 'closed' && "border-[hsl(var(--chart-2))]/30 bg-[hsl(var(--chart-2))]/5",
       isSubtask && "ml-8 border-l-4 border-l-primary/30"
     )}>
@@ -70,6 +72,14 @@ export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete,
             </span>
           </div>
           
+          {/* Blocked by subtask message */}
+          {task.waiting_for_subtask && (
+            <div className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 p-2 rounded flex items-center gap-2">
+              <Ban className="h-3 w-3" />
+              Blocked: Waiting for subtask to complete. This does not affect your performance.
+            </div>
+          )}
+          
           {/* Closure Comment if pending */}
           {task.closure_pending && task.closure_comment && (
             <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded italic">
@@ -86,7 +96,13 @@ export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete,
             <span className="pill">Created {task.created_at}</span>
             <span className="pill">Target {task.current_target_date}</span>
             
-            {task.closure_pending && (
+            {task.waiting_for_subtask && (
+              <span className="pill bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                Blocked
+              </span>
+            )}
+            
+            {task.closure_pending && !task.waiting_for_subtask && (
               <span className="pill bg-[hsl(var(--chart-3))/0.15] text-[hsl(var(--chart-3))] border-[hsl(var(--chart-3))/0.3]">
                 Pending HOD Approval
               </span>

@@ -75,6 +75,7 @@ export type Database = {
           target_date_history: string[]
           title: string
           updated_at: string
+          waiting_for_subtask: boolean
         }
         Insert: {
           closure_approved_by?: string | null
@@ -95,6 +96,7 @@ export type Database = {
           target_date_history?: string[]
           title: string
           updated_at?: string
+          waiting_for_subtask?: boolean
         }
         Update: {
           closure_approved_by?: string | null
@@ -115,6 +117,7 @@ export type Database = {
           target_date_history?: string[]
           title?: string
           updated_at?: string
+          waiting_for_subtask?: boolean
         }
         Relationships: [
           {

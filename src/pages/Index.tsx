@@ -56,20 +56,22 @@ const Index = () => {
       closure_comment: null,
       closure_requested_by: null,
       closure_approved_by: null,
-      parent_task_id: parentTaskId
+      parent_task_id: parentTaskId,
+      waiting_for_subtask: false
     });
 
     if (result.success) {
       toast({
         title: 'Subtask added',
-        description: 'The subtask has been created and the parent task remains open.',
+        description: 'The subtask has been created. Parent task is now blocked until subtask completes.',
       });
       
-      // Also reset the closure pending status of the parent task
+      // Mark parent task as waiting for subtask - excludes from performance metrics
       await updateTask(parentTaskId, {
         closure_pending: false,
         closure_comment: null,
-        closure_requested_by: null
+        closure_requested_by: null,
+        waiting_for_subtask: true
       });
     }
 
