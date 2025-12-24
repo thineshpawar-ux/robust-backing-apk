@@ -43,6 +43,7 @@ export function useUserRoles() {
   };
 
   const fetchCurrentUserRole = async (userId: string) => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .rpc('get_user_role', { _user_id: userId });
@@ -51,7 +52,9 @@ export function useUserRoles() {
       setCurrentUserRole(data as AppRole);
     } catch (error: any) {
       console.error('Error fetching current user role:', error);
-      setCurrentUserRole(null);
+      setCurrentUserRole('team_member'); // Default to team_member if error
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -80,11 +83,11 @@ export function useUserRoles() {
   };
 
   const isHOD = (userId?: string, userEmail?: string): boolean => {
-    // Check by email first (Hariharan is always HOD)
-    if (userEmail && userEmail.toLowerCase().includes('hariharan')) {
+    // Check currentUserRole first (from database function)
+    if (currentUserRole === 'hod') {
       return true;
     }
-    // Then check by role in database
+    // Fallback: check by role in userRoles array
     if (!userId) return false;
     const userRole = userRoles.find(r => r.user_id === userId);
     return userRole?.role === 'hod';
