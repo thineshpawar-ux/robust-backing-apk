@@ -115,7 +115,9 @@ export function TeamView({
       <Card className="border-border">
         <CardHeader className="pb-4">
           <CardTitle className="text-base">Team Tasks</CardTitle>
-          <CardDescription>Single list for all supplier quality work.</CardDescription>
+          <CardDescription>
+            Click "Request Close" to send task for HOD approval. Switch to "Closed Tasks" tab to see completed work.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <TaskForm
