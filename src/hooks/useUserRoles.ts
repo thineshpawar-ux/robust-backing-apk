@@ -79,7 +79,12 @@ export function useUserRoles() {
     }
   };
 
-  const isHOD = (userId?: string): boolean => {
+  const isHOD = (userId?: string, userEmail?: string): boolean => {
+    // Check by email first (Hariharan is always HOD)
+    if (userEmail && userEmail.toLowerCase().includes('hariharan')) {
+      return true;
+    }
+    // Then check by role in database
     if (!userId) return false;
     const userRole = userRoles.find(r => r.user_id === userId);
     return userRole?.role === 'hod';

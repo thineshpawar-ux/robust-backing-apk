@@ -5,20 +5,31 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { TEAM_MEMBERS } from '@/types/task';
+
+// All users including HOD
+const ALL_USERS = ['Hariharan', ...TEAM_MEMBERS] as const;
 
 const authSchema = z.object({
-  email: z.string().trim().email({ message: 'Invalid email address' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters' })
+  name: z.string().trim().min(1, { message: 'Please select your name' }),
+  password: z.string().min(4, { message: 'Password must be at least 4 characters' })
 });
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; password?: string }>({});
   
   const { user, signIn, signUp } = useAuth();
   const navigate = useNavigate();
@@ -31,11 +42,11 @@ export default function Auth() {
   }, [user, navigate]);
 
   const validateForm = () => {
-    const result = authSchema.safeParse({ email, password });
+    const result = authSchema.safeParse({ name, password });
     if (!result.success) {
-      const fieldErrors: { email?: string; password?: string } = {};
+      const fieldErrors: { name?: string; password?: string } = {};
       result.error.errors.forEach(err => {
-        if (err.path[0] === 'email') fieldErrors.email = err.message;
+        if (err.path[0] === 'name') fieldErrors.name = err.message;
         if (err.path[0] === 'password') fieldErrors.password = err.message;
       });
       setErrors(fieldErrors);
@@ -45,11 +56,16 @@ export default function Auth() {
     return true;
   };
 
+  // Convert name to email format for Supabase (behind the scenes)
+  const nameToEmail = (name: string) => `${name.toLowerCase().replace(/\s+/g, '')}@sqtodo.local`;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
 
     setLoading(true);
+    const email = nameToEmail(name);
+    
     try {
       if (isLogin) {
         const { error } = await signIn(email, password);
@@ -57,7 +73,7 @@ export default function Auth() {
           if (error.message.includes('Invalid login credentials')) {
             toast({
               title: 'Login failed',
-              description: 'Invalid email or password. Please try again.',
+              description: 'Invalid name or password. Please try again or sign up first.',
               variant: 'destructive'
             });
           } else {
@@ -69,7 +85,7 @@ export default function Auth() {
           }
         } else {
           toast({
-            title: 'Welcome back!',
+            title: `Welcome back, ${name}!`,
             description: 'You have been logged in successfully.'
           });
         }
@@ -79,7 +95,7 @@ export default function Auth() {
           if (error.message.includes('already registered')) {
             toast({
               title: 'Sign up failed',
-              description: 'This email is already registered. Please log in instead.',
+              description: 'This name is already registered. Please log in instead.',
               variant: 'destructive'
             });
           } else {
@@ -92,7 +108,7 @@ export default function Auth() {
         } else {
           toast({
             title: 'Account created!',
-            description: 'You can now access the app.'
+            description: `Welcome, ${name}! You can now access the app.`
           });
         }
       }
@@ -115,20 +131,23 @@ export default function Auth() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-xs text-muted-foreground">
-                Email
+              <Label htmlFor="name" className="text-xs text-muted-foreground">
+                Name
               </Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                className="h-10"
-                required
-              />
-              {errors.email && (
-                <p className="text-xs text-destructive">{errors.email}</p>
+              <Select value={name} onValueChange={setName}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Select your name" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ALL_USERS.map(user => (
+                    <SelectItem key={user} value={user}>
+                      {user} {user === 'Hariharan' && '(HOD)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.name && (
+                <p className="text-xs text-destructive">{errors.name}</p>
               )}
             </div>
 
@@ -153,7 +172,7 @@ export default function Auth() {
             <Button 
               type="submit" 
               className="w-full rounded-full" 
-              disabled={loading}
+              disabled={loading || !name}
             >
               {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
             </Button>
@@ -166,9 +185,15 @@ export default function Auth() {
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               {isLogin 
-                ? "Don't have an account? Sign up" 
+                ? "First time? Sign up" 
                 : 'Already have an account? Sign in'}
             </button>
+          </div>
+
+          <div className="mt-6 p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground">
+            <strong>First time users:</strong> Click "Sign up", select your name, and create a password.
+            <br />
+            <strong>HOD:</strong> Hariharan (can approve closures & add subtasks)
           </div>
         </CardContent>
       </Card>
