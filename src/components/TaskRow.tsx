@@ -1,4 +1,4 @@
-import { Task, DELETE_PASSWORD } from '@/types/task';
+import { Task, DELETE_PASSWORD, TEAM_MEMBERS } from '@/types/task';
 import { isOverdue } from '@/lib/date-utils';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -18,9 +18,8 @@ export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete,
   const overdue = isOverdue(task.current_target_date, task.status);
   const dateChanges = (task.target_date_history?.length || 1) - 1;
 
-  // Check if current user is the task owner
-  const isOwner = currentUser && task.owner.toLowerCase().includes(currentUser.toLowerCase());
-  const canRequestClosure = isOwner && task.status === 'open' && !task.closure_pending;
+  // Any team member can request closure for open tasks
+  const canRequestClosure = task.status === 'open' && !task.closure_pending;
 
   const handleDelete = () => {
     const pwd = prompt('Enter delete password to remove this task:');
@@ -42,7 +41,8 @@ export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete,
     <div className={cn(
       "rounded-lg border bg-card p-4 mb-3 animate-fade-in transition-all hover:shadow-md",
       task.closure_pending && "border-[hsl(var(--chart-3))] bg-[hsl(var(--chart-3))/0.03]",
-      overdue && !task.closure_pending && "border-destructive/50 bg-destructive/5",
+      overdue && !task.closure_pending && task.status === 'open' && "border-destructive/50 bg-destructive/5",
+      task.status === 'closed' && "border-[hsl(var(--chart-2))]/30 bg-[hsl(var(--chart-2))]/5",
       isSubtask && "ml-8 border-l-4 border-l-primary/30"
     )}>
       <div className="flex items-start gap-4">
@@ -88,7 +88,7 @@ export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete,
             
             {task.closure_pending && (
               <span className="pill bg-[hsl(var(--chart-3))/0.15] text-[hsl(var(--chart-3))] border-[hsl(var(--chart-3))/0.3]">
-                Pending Closure
+                Pending HOD Approval
               </span>
             )}
             
@@ -98,7 +98,7 @@ export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete,
               </span>
             )}
             
-            {overdue && !task.closure_pending && (
+            {overdue && !task.closure_pending && task.status === 'open' && (
               <span className="pill pill-overdue">Overdue</span>
             )}
             
@@ -107,7 +107,11 @@ export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete,
             )}
             
             {task.completed_at && (
-              <span className="pill">Closed {task.completed_at}</span>
+              <span className="pill bg-[hsl(var(--chart-2))]/15 text-[hsl(var(--chart-2))]">Closed {task.completed_at}</span>
+            )}
+            
+            {task.closure_approved_by && (
+              <span className="pill bg-[hsl(var(--chart-2))]/15 text-[hsl(var(--chart-2))]">Approved by {task.closure_approved_by}</span>
             )}
             
             {!task.closure_pending && (
@@ -124,44 +128,32 @@ export function TaskRow({ task, currentUser, onEdit, onRequestClosure, onDelete,
         {/* Actions */}
         <div className="flex flex-col gap-1.5 flex-shrink-0">
           {task.status === 'open' && !task.closure_pending && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => onRequestClosure(task)}
-                      disabled={!canRequestClosure}
-                      className="h-7 text-xs rounded-full w-full"
-                    >
-                      Close
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {!canRequestClosure && (
-                  <TooltipContent>
-                    <p>Only task owner can request closure</p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => onRequestClosure(task)}
+              className="h-7 text-xs rounded-full w-full"
+            >
+              Request Close
+            </Button>
           )}
           
           {task.closure_pending && (
-            <span className="text-xs text-[hsl(var(--chart-3))] font-medium text-center">
-              Awaiting HOD
+            <span className="text-xs text-[hsl(var(--chart-3))] font-medium text-center px-2">
+              → HOD Dashboard
             </span>
           )}
           
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onEdit(task)}
-            className="h-7 text-xs rounded-full"
-          >
-            Edit
-          </Button>
+          {task.status === 'open' && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onEdit(task)}
+              className="h-7 text-xs rounded-full"
+            >
+              Edit
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
