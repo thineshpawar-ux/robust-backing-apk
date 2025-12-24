@@ -25,6 +25,7 @@ import {
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import { SubtaskDialog } from './SubtaskDialog';
+import { ClosureRejectionDialog } from './ClosureRejectionDialog';
 import {
   Table,
   TableBody,
@@ -41,7 +42,7 @@ interface HODDashboardProps {
   onApproveDateChange?: (taskId: string, approvedBy: string) => Promise<{ success: boolean }>;
   onRejectDateChange?: (taskId: string) => Promise<{ success: boolean }>;
   onApproveClosure?: (taskId: string, approvedBy: string) => Promise<{ success: boolean }>;
-  onRejectClosure?: (taskId: string) => Promise<{ success: boolean }>;
+  onRejectClosure?: (taskId: string, rejectionComment: string) => Promise<{ success: boolean }>;
   onAddSubtask?: (parentTaskId: string, title: string, owner: string, targetDate: string) => Promise<{ success: boolean }>;
 }
 
@@ -56,6 +57,7 @@ export function HODDashboard({
   onAddSubtask 
 }: HODDashboardProps) {
   const [subtaskParentTask, setSubtaskParentTask] = useState<Task | null>(null);
+  const [rejectingTask, setRejectingTask] = useState<Task | null>(null);
   const { isHOD } = useUserRoles();
   const userIsHOD = isHOD(currentUserId, currentUserEmail);
 
@@ -127,6 +129,13 @@ export function HODDashboard({
     if (subtaskParentTask && onAddSubtask) {
       await onAddSubtask(subtaskParentTask.id, title, owner, targetDate);
       setSubtaskParentTask(null);
+    }
+  };
+
+  const handleRejectClosure = async (comment: string) => {
+    if (rejectingTask && onRejectClosure) {
+      await onRejectClosure(rejectingTask.id, comment);
+      setRejectingTask(null);
     }
   };
 
@@ -545,7 +554,7 @@ export function HODDashboard({
                                       size="sm"
                                       variant="ghost"
                                       className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
-                                      onClick={() => onRejectClosure?.(task.id)}
+                                      onClick={() => setRejectingTask(task)}
                                       disabled={!userIsHOD}
                                     >
                                       <X className="h-4 w-4" />
@@ -751,6 +760,14 @@ export function HODDashboard({
         onOpenChange={(open) => !open && setSubtaskParentTask(null)}
         parentTaskTitle={subtaskParentTask?.title || ''}
         onSubmit={handleAddSubtask}
+      />
+
+      {/* Closure Rejection Dialog */}
+      <ClosureRejectionDialog
+        open={!!rejectingTask}
+        onOpenChange={(open) => !open && setRejectingTask(null)}
+        taskTitle={rejectingTask?.title || ''}
+        onSubmit={handleRejectClosure}
       />
     </div>
   );

@@ -37,7 +37,8 @@ export function useTasks() {
         closure_requested_by: (t as any).closure_requested_by,
         closure_approved_by: (t as any).closure_approved_by,
         parent_task_id: (t as any).parent_task_id || null,
-        waiting_for_subtask: (t as any).waiting_for_subtask || false
+        waiting_for_subtask: (t as any).waiting_for_subtask || false,
+        closure_rejection_comment: (t as any).closure_rejection_comment || null
       }));
       
       setTasks(mappedTasks);
@@ -73,7 +74,8 @@ export function useTasks() {
               closure_requested_by: newTask.closure_requested_by,
               closure_approved_by: newTask.closure_approved_by,
               parent_task_id: newTask.parent_task_id || null,
-              waiting_for_subtask: newTask.waiting_for_subtask || false
+              waiting_for_subtask: newTask.waiting_for_subtask || false,
+              closure_rejection_comment: newTask.closure_rejection_comment || null
             };
             setTasks(prev => [mappedTask, ...prev]);
             toast({
@@ -90,7 +92,8 @@ export function useTasks() {
               closure_requested_by: updated.closure_requested_by,
               closure_approved_by: updated.closure_approved_by,
               parent_task_id: updated.parent_task_id || null,
-              waiting_for_subtask: updated.waiting_for_subtask || false
+              waiting_for_subtask: updated.waiting_for_subtask || false,
+              closure_rejection_comment: updated.closure_rejection_comment || null
             };
             setTasks(prev => prev.map(t => t.id === mappedTask.id ? mappedTask : t));
           } else if (payload.eventType === 'DELETE') {
@@ -230,11 +233,38 @@ export function useTasks() {
           status: 'closed',
           completed_at: new Date().toISOString().split('T')[0],
           closure_pending: false,
-          closure_approved_by: approvedBy
+          closure_approved_by: approvedBy,
+          closure_rejection_comment: null
         })
         .eq('id', taskId);
 
       if (error) throw error;
+
+      // Check if this task has a parent that's waiting for subtasks
+      if (task.parent_task_id) {
+        // Check if all subtasks of the parent are now closed
+        const siblingSubtasks = tasks.filter(t => 
+          t.parent_task_id === task.parent_task_id && t.id !== taskId
+        );
+        const allSubtasksClosed = siblingSubtasks.every(t => t.status === 'closed');
+        
+        if (allSubtasksClosed) {
+          // Auto-close the parent task
+          await supabase
+            .from('tasks')
+            .update({
+              status: 'closed',
+              completed_at: new Date().toISOString().split('T')[0],
+              waiting_for_subtask: false
+            })
+            .eq('id', task.parent_task_id);
+            
+          toast({
+            title: 'Parent task auto-closed',
+            description: 'All subtasks completed, parent task is now closed',
+          });
+        }
+      }
 
       // Create notification for task owner
       await supabase.from('notifications').insert({
@@ -256,7 +286,7 @@ export function useTasks() {
     }
   };
 
-  const rejectClosure = async (taskId: string) => {
+  const rejectClosure = async (taskId: string, rejectionComment: string) => {
     try {
       const task = tasks.find(t => t.id === taskId);
       
@@ -265,7 +295,8 @@ export function useTasks() {
         .update({
           closure_pending: false,
           closure_comment: null,
-          closure_requested_by: null
+          closure_requested_by: null,
+          closure_rejection_comment: rejectionComment
         })
         .eq('id', taskId);
 
@@ -276,7 +307,7 @@ export function useTasks() {
         await supabase.from('notifications').insert({
           user_id: task.owner,
           title: 'Task Closure Rejected',
-          message: `Your closure request for "${task.title}" has been rejected.`,
+          message: `Your closure request for "${task.title}" has been rejected. Reason: ${rejectionComment}`,
           type: 'warning',
           task_id: taskId
         });
@@ -284,7 +315,7 @@ export function useTasks() {
       
       toast({
         title: 'Closure rejected',
-        description: 'Request has been declined',
+        description: 'Request has been declined with comment',
       });
       return { success: true };
     } catch (error) {
