@@ -5,8 +5,8 @@ import { NotificationBell } from './NotificationBell';
 
 interface HeaderProps {
   connected: boolean;
-  activeView: 'team' | 'hod';
-  onViewChange: (view: 'team' | 'hod') => void;
+  activeView: 'team' | 'hod' | 'admin';
+  onViewChange: (view: 'team' | 'hod' | 'admin') => void;
   userEmail?: string;
   currentUser?: string;
   onSignOut: () => void;
@@ -48,7 +48,7 @@ export function Header({ connected, activeView, onViewChange, userEmail, current
               type="button"
               onClick={() => onViewChange('team')}
               className={cn(
-                "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+                "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
                 activeView === 'team' 
                   ? "bg-primary text-primary-foreground" 
                   : "text-muted-foreground hover:text-foreground"
@@ -60,13 +60,25 @@ export function Header({ connected, activeView, onViewChange, userEmail, current
               type="button"
               onClick={() => onViewChange('hod')}
               className={cn(
-                "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+                "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
                 activeView === 'hod' 
                   ? "bg-primary text-primary-foreground" 
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
               Dashboard
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewChange('admin')}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                activeView === 'admin' 
+                  ? "bg-primary text-primary-foreground" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Admin
             </button>
           </div>
         )}

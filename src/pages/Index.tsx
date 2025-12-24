@@ -4,6 +4,7 @@ import { Header } from '@/components/Header';
 import { TeamView } from '@/components/TeamView';
 import { HODDashboard } from '@/components/HODDashboard';
 import { TeamMemberDashboard } from '@/components/TeamMemberDashboard';
+import { HODAdminPanel } from '@/components/HODAdminPanel';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,7 +14,7 @@ import { todayISO } from '@/lib/date-utils';
 
 const Index = () => {
   const navigate = useNavigate();
-  const [activeView, setActiveView] = useState<'team' | 'hod'>('team');
+  const [activeView, setActiveView] = useState<'team' | 'hod' | 'admin'>('team');
   const { tasks, loading, connected, addTask, updateTask, deleteTask, requestDateChange, requestClosure, approveClosure, rejectClosure, approveDateChange, rejectDateChange } = useTasks();
   const { user, signOut } = useAuth();
   const { fetchCurrentUserRole, currentUserRole, loading: roleLoading } = useUserRoles();
@@ -149,6 +150,10 @@ const Index = () => {
                 />
               </CardContent>
             </Card>
+          )}
+
+          {currentUserIsHOD && activeView === 'admin' && (
+            <HODAdminPanel currentUserId={user?.id} />
           )}
         </main>
 
