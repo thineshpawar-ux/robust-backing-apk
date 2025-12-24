@@ -14,7 +14,7 @@ const Index = () => {
   const [activeView, setActiveView] = useState<'team' | 'hod'>('team');
   const { tasks, loading, connected, addTask, updateTask, deleteTask, requestDateChange, requestClosure, approveClosure, rejectClosure, approveDateChange, rejectDateChange } = useTasks();
   const { user, signOut } = useAuth();
-  const { fetchCurrentUserRole, isHOD } = useUserRoles();
+  const { fetchCurrentUserRole, currentUserRole, loading: roleLoading } = useUserRoles();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -80,8 +80,16 @@ const Index = () => {
     return result;
   };
 
-  const currentUserIsHOD = isHOD(user?.id, user?.email);
+  const currentUserIsHOD = currentUserRole === 'hod';
 
+  // Show loading while role is being determined
+  if (roleLoading && !currentUserRole) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-sm text-muted-foreground">Loading your dashboard...</div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-background">
       <div className="container py-4 max-w-[1100px]">
