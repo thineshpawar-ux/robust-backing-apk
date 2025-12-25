@@ -1,78 +1,69 @@
-import { useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { useEffect, useState, useCallback } from 'react';
+import { localAuth, LocalUser } from '@/lib/localStorage';
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<LocalUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
+    // Check for existing session
+    const currentUser = localAuth.getCurrentUser();
+    setUser(currentUser);
+    setLoading(false);
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+    // Subscribe to auth changes
+    const unsubscribe = localAuth.subscribeToAuth(() => {
+      setUser(localAuth.getCurrentUser());
     });
 
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl
-      }
-    });
-    return { error };
-  };
+  const signUp = useCallback(async (email: string, password: string, securityAnswer?: string) => {
+    // Extract name from email format
+    const name = email.replace('@sqtodo.local', '').replace(/([a-z])([A-Z])/g, '$1 $2');
+    const { user, error } = localAuth.signUp(name, password, securityAnswer);
+    return { error: error ? new Error(error) : null };
+  }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    return { error };
-  };
+  const signUpWithName = useCallback(async (name: string, password: string, securityAnswer?: string) => {
+    const { user, error } = localAuth.signUp(name, password, securityAnswer);
+    return { error: error ? new Error(error) : null };
+  }, []);
 
-  const signOut = async () => {
-    // Use scope: 'local' to only clear local session without server call
-    // This prevents errors when session is already expired on server
-    try {
-      await supabase.auth.signOut({ scope: 'local' });
-    } catch (err) {
-      console.warn('Sign out error:', err);
-    }
-    // Always clear local state
-    setSession(null);
-    setUser(null);
+  const signIn = useCallback(async (email: string, password: string) => {
+    // Extract name from email format
+    const name = email.replace('@sqtodo.local', '');
+    const { user, error } = localAuth.signIn(name, password);
+    return { error: error ? new Error(error) : null };
+  }, []);
+
+  const signInWithName = useCallback(async (name: string, password: string) => {
+    const { user, error } = localAuth.signIn(name, password);
+    return { error: error ? new Error(error) : null };
+  }, []);
+
+  const signOut = useCallback(async () => {
+    localAuth.signOut();
     return { error: null };
-  };
+  }, []);
 
-  const updatePassword = async (newPassword: string) => {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    return { error };
-  };
+  const updatePassword = useCallback(async (newPassword: string) => {
+    if (!user) {
+      return { error: new Error('No user logged in') };
+    }
+    const { error } = localAuth.updatePassword(user.id, newPassword);
+    return { error: error ? new Error(error) : null };
+  }, [user]);
 
   return {
     user,
-    session,
+    session: user ? { user } : null, // Compatibility with old interface
     loading,
     signUp,
+    signUpWithName,
     signIn,
+    signInWithName,
     signOut,
     updatePassword
   };

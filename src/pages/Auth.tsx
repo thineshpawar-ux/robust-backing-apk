@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { localTeamMembers, localAuth, initializeDefaultData } from '@/lib/localStorage';
 import { KeyRound } from 'lucide-react';
 
 interface TeamMember {
@@ -48,22 +48,23 @@ export default function Auth() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
   
-  const { user, signIn, signUp } = useAuth();
+  const { user, signUpWithName, signInWithName, updatePassword } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Fetch team members on mount
+  // Initialize default data and fetch team members on mount
   useEffect(() => {
-    const fetchMembers = async () => {
-      const { data } = await supabase
-        .from('team_members')
-        .select('id, name, is_hod, is_active')
-        .eq('is_active', true)
-        .order('name');
-      setTeamMembers(data || []);
-      setMembersLoading(false);
-    };
-    fetchMembers();
+    initializeDefaultData();
+    const members = localTeamMembers.getActive();
+    setTeamMembers(members);
+    setMembersLoading(false);
+
+    // Subscribe to changes
+    const unsubscribe = localTeamMembers.subscribe(() => {
+      setTeamMembers(localTeamMembers.getActive());
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -100,9 +101,6 @@ export default function Auth() {
     return true;
   };
 
-  // Convert name to email format for Supabase (behind the scenes)
-  const nameToEmail = (name: string) => `${name.toLowerCase().replace(/\s+/g, '')}@sqtodo.local`;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -114,11 +112,10 @@ export default function Auth() {
     if (!validateAuthForm()) return;
 
     setLoading(true);
-    const email = nameToEmail(name);
     
     try {
       if (mode === 'login') {
-        const { error } = await signIn(email, password);
+        const { error } = await signInWithName(name, password);
         if (error) {
           if (error.message.includes('Invalid login credentials')) {
             toast({
@@ -146,9 +143,9 @@ export default function Auth() {
           return;
         }
 
-        const { error } = await signUp(email, password);
+        const { error } = await signUpWithName(name, password, securityAnswer);
         if (error) {
-          if (error.message.includes('already registered')) {
+          if (error.message.includes('already')) {
             toast({
               title: 'Sign up failed',
               description: 'This name is already registered. Please log in instead.',
@@ -162,17 +159,6 @@ export default function Auth() {
             });
           }
         } else {
-          // Save security answer after successful signup
-          setTimeout(async () => {
-            const { data: { user: newUser } } = await supabase.auth.getUser();
-            if (newUser) {
-              await supabase
-                .from('user_roles')
-                .update({ security_answer: securityAnswer.toLowerCase().trim() })
-                .eq('user_id', newUser.id);
-            }
-          }, 1000);
-
           toast({
             title: 'Account created!',
             description: `Welcome, ${name}! You can now access the app.`
@@ -188,60 +174,40 @@ export default function Auth() {
     if (!validateResetForm()) return;
 
     setLoading(true);
-    const email = nameToEmail(name);
+    const email = `${name.toLowerCase().replace(/\s+/g, '')}@sqtodo.local`;
     
     try {
-      // Check if security answer matches
-      const { data: userRole, error: fetchError } = await supabase
-        .from('user_roles')
-        .select('security_answer, user_id')
-        .eq('user_email', email)
-        .single();
+      // Verify security answer
+      const { valid, userId } = localAuth.verifySecurityAnswer(email, securityAnswer);
 
-      if (fetchError || !userRole) {
+      if (!valid) {
         toast({
           title: 'Reset failed',
-          description: 'User not found. Please sign up first.',
+          description: 'Incorrect pet name or user not found. Please try again.',
           variant: 'destructive'
         });
         setLoading(false);
         return;
       }
 
-      if (!userRole.security_answer) {
-        toast({
-          title: 'Reset unavailable',
-          description: 'No security answer set for this account. Contact HOD for help.',
-          variant: 'destructive'
-        });
-        setLoading(false);
-        return;
+      // Update password
+      if (userId) {
+        const { error } = localAuth.updatePassword(userId, newPassword);
+        if (error) {
+          toast({
+            title: 'Reset failed',
+            description: error,
+            variant: 'destructive'
+          });
+        } else {
+          toast({
+            title: 'Password reset successful!',
+            description: 'You can now log in with your new password.',
+          });
+          setMode('login');
+          resetForm();
+        }
       }
-
-      if (userRole.security_answer !== securityAnswer.toLowerCase().trim()) {
-        toast({
-          title: 'Reset failed',
-          description: 'Incorrect pet name. Please try again.',
-          variant: 'destructive'
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Security answer matched - sign in first then update password
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password: newPassword // This won't work - need admin API
-      });
-
-      // For now, show success and ask user to contact HOD
-      // A proper implementation would use an edge function with service role
-      toast({
-        title: 'Security verified!',
-        description: 'Please contact HOD to reset your password, or try logging in with your current password.',
-      });
-      setMode('login');
-      
     } catch (err) {
       toast({
         title: 'Reset failed',
@@ -413,7 +379,7 @@ export default function Auth() {
           <div className="mt-6 p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground">
             <strong>First time users:</strong> Click "Sign up", select your name, set your pet name for recovery, and create a password.
             <br />
-            <strong>HOD:</strong> Hariharan (can approve closures & manage team)
+            <strong>Offline Mode:</strong> Data is stored locally in your browser.
           </div>
         </CardContent>
       </Card>

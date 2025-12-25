@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { localUserRoles, LocalUserRole } from '@/lib/localStorage';
 import { useToast } from '@/hooks/use-toast';
 
 export type AppRole = 'hod' | 'team_member';
@@ -19,82 +19,58 @@ export function useUserRoles() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchUserRoles = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('*')
-        .order('user_email');
-
-      if (error) throw error;
-      
-      // Cast the role field to AppRole type
-      const typedData = (data || []).map(row => ({
-        ...row,
-        role: row.role as AppRole
-      }));
-      
-      setUserRoles(typedData);
-    } catch (error: any) {
-      console.error('Error fetching user roles:', error);
-    } finally {
-      setLoading(false);
-    }
+  const fetchUserRoles = () => {
+    const roles = localUserRoles.getAll();
+    setUserRoles(roles.sort((a, b) => a.user_email.localeCompare(b.user_email)));
+    setLoading(false);
   };
 
-  const fetchCurrentUserRole = async (userId: string) => {
+  const fetchCurrentUserRole = (userId: string) => {
     setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .rpc('get_user_role', { _user_id: userId });
-
-      if (error) throw error;
-      setCurrentUserRole(data as AppRole);
-    } catch (error: any) {
-      console.error('Error fetching current user role:', error);
-      setCurrentUserRole('team_member'); // Default to team_member if error
-    } finally {
-      setLoading(false);
-    }
+    const role = localUserRoles.getByUserId(userId);
+    setCurrentUserRole(role?.role || 'team_member');
+    setLoading(false);
   };
 
   const updateUserRole = async (userId: string, newRole: AppRole) => {
-    try {
-      const { error } = await supabase
-        .from('user_roles')
-        .update({ role: newRole })
-        .eq('user_id', userId);
+    const { error } = localUserRoles.update(userId, newRole);
 
-      if (error) throw error;
-
-      toast({
-        title: 'Role Updated',
-        description: 'User role has been updated successfully.',
-      });
-
-      await fetchUserRoles();
-    } catch (error: any) {
+    if (error) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to update user role',
+        description: error,
         variant: 'destructive',
       });
+      return;
     }
+
+    toast({
+      title: 'Role Updated',
+      description: 'User role has been updated successfully.',
+    });
+
+    fetchUserRoles();
   };
 
   const isHOD = (userId?: string, userEmail?: string): boolean => {
-    // Check currentUserRole first (from database function)
+    // Check currentUserRole first
     if (currentUserRole === 'hod') {
       return true;
     }
     // Fallback: check by role in userRoles array
     if (!userId) return false;
-    const userRole = userRoles.find(r => r.user_id === userId);
-    return userRole?.role === 'hod';
+    return localUserRoles.isHOD(userId);
   };
 
   useEffect(() => {
     fetchUserRoles();
+
+    // Subscribe to changes
+    const unsubscribe = localUserRoles.subscribe(() => {
+      fetchUserRoles();
+    });
+
+    return () => unsubscribe();
   }, []);
 
   return {
