@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { localTeamMembers, LocalTeamMember } from '@/lib/localStorage';
 import { useToast } from '@/hooks/use-toast';
 
 export interface TeamMember {
@@ -17,119 +17,86 @@ export function useTeamMembers() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchTeamMembers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('team_members')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      setTeamMembers(data || []);
-    } catch (error: any) {
-      console.error('Error fetching team members:', error);
-    } finally {
-      setLoading(false);
-    }
+  const fetchTeamMembers = () => {
+    const members = localTeamMembers.getAll();
+    setTeamMembers(members.sort((a, b) => a.name.localeCompare(b.name)));
+    setLoading(false);
   };
 
   const addTeamMember = async (name: string, isHod: boolean = false) => {
-    try {
-      const { error } = await supabase
-        .from('team_members')
-        .insert({ name: name.trim(), is_hod: isHod });
+    const { member, error } = localTeamMembers.add(name, isHod);
 
-      if (error) {
-        if (error.message.includes('duplicate')) {
-          toast({
-            title: 'Member exists',
-            description: 'A team member with this name already exists.',
-            variant: 'destructive'
-          });
-        } else {
-          throw error;
-        }
-        return { success: false };
+    if (error) {
+      if (error.includes('exists')) {
+        toast({
+          title: 'Member exists',
+          description: 'A team member with this name already exists.',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: error,
+          variant: 'destructive'
+        });
       }
-
-      toast({
-        title: 'Member added',
-        description: `${name} has been added to the team.`
-      });
-      
-      await fetchTeamMembers();
-      return { success: true };
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to add team member',
-        variant: 'destructive'
-      });
       return { success: false };
     }
+
+    toast({
+      title: 'Member added',
+      description: `${name} has been added to the team.`
+    });
+    
+    return { success: true };
   };
 
   const updateTeamMember = async (id: string, updates: Partial<Pick<TeamMember, 'name' | 'is_active' | 'is_hod'>>) => {
-    try {
-      const { error } = await supabase
-        .from('team_members')
-        .update(updates)
-        .eq('id', id);
+    const { error } = localTeamMembers.update(id, updates);
 
-      if (error) {
-        if (error.message.includes('duplicate')) {
-          toast({
-            title: 'Name exists',
-            description: 'A team member with this name already exists.',
-            variant: 'destructive'
-          });
-        } else {
-          throw error;
-        }
-        return { success: false };
+    if (error) {
+      if (error.includes('exists')) {
+        toast({
+          title: 'Name exists',
+          description: 'A team member with this name already exists.',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: error,
+          variant: 'destructive'
+        });
       }
-
-      toast({
-        title: 'Member updated',
-        description: 'Team member has been updated.'
-      });
-      
-      await fetchTeamMembers();
-      return { success: true };
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to update team member',
-        variant: 'destructive'
-      });
       return { success: false };
     }
+
+    toast({
+      title: 'Member updated',
+      description: 'Team member has been updated.'
+    });
+    
+    return { success: true };
   };
 
   const deleteTeamMember = async (id: string, name: string) => {
-    try {
-      const { error } = await supabase
-        .from('team_members')
-        .delete()
-        .eq('id', id);
+    const { error } = localTeamMembers.delete(id);
 
-      if (error) throw error;
-
-      toast({
-        title: 'Member removed',
-        description: `${name} has been removed from the team.`
-      });
-      
-      await fetchTeamMembers();
-      return { success: true };
-    } catch (error: any) {
+    if (error) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to remove team member',
+        description: error,
         variant: 'destructive'
       });
       return { success: false };
     }
+
+    toast({
+      title: 'Member removed',
+      description: `${name} has been removed from the team.`
+    });
+    
+    return { success: true };
   };
 
   // Get active members for dropdowns
@@ -140,6 +107,13 @@ export function useTeamMembers() {
 
   useEffect(() => {
     fetchTeamMembers();
+
+    // Subscribe to changes
+    const unsubscribe = localTeamMembers.subscribe(() => {
+      fetchTeamMembers();
+    });
+
+    return () => unsubscribe();
   }, []);
 
   return {

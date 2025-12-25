@@ -6,13 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Table,
   TableBody,
   TableCell,
@@ -41,20 +34,17 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Shield, User, Crown, Users, UserPlus, Trash2, Edit, Settings, UserCheck, UserX } from 'lucide-react';
-import { useUserRoles, AppRole, UserRole } from '@/hooks/useUserRoles';
+import { useUserRoles, AppRole } from '@/hooks/useUserRoles';
 import { useTeamMembers, TeamMember } from '@/hooks/useTeamMembers';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 interface HODAdminPanelProps {
   currentUserId?: string;
 }
 
 export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
-  const { userRoles, loading: rolesLoading, updateUserRole, isHOD, fetchUserRoles } = useUserRoles();
-  const { teamMembers, loading: membersLoading, addTeamMember, updateTeamMember, deleteTeamMember, fetchTeamMembers } = useTeamMembers();
-  const [editingUser, setEditingUser] = useState<string | null>(null);
-  const [selectedRole, setSelectedRole] = useState<AppRole>('team_member');
+  const { userRoles, loading: rolesLoading, updateUserRole, isHOD } = useUserRoles();
+  const { teamMembers, loading: membersLoading, addTeamMember, updateTeamMember, deleteTeamMember } = useTeamMembers();
   
   // Add member dialog
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -73,11 +63,6 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
   const { toast } = useToast();
 
   const canManageRoles = isHOD(currentUserId);
-
-  const handleRoleChange = async (userId: string) => {
-    await updateUserRole(userId, selectedRole);
-    setEditingUser(null);
-  };
 
   const handleAddMember = async () => {
     if (!newMemberName.trim()) {
@@ -129,23 +114,6 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
     await deleteTeamMember(member.id, member.name);
   };
 
-  const getRoleBadge = (role: AppRole) => {
-    if (role === 'hod') {
-      return (
-        <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30">
-          <Crown className="h-3 w-3 mr-1" />
-          HOD
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="secondary">
-        <User className="h-3 w-3 mr-1" />
-        Team Member
-      </Badge>
-    );
-  };
-
   const hodCount = teamMembers.filter(m => m.is_hod).length;
   const activeCount = teamMembers.filter(m => m.is_active).length;
   const inactiveCount = teamMembers.filter(m => !m.is_active).length;
@@ -185,7 +153,7 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
             Admin Panel
           </CardTitle>
           <CardDescription>
-            Manage team members, roles, and permissions
+            Manage team members, roles, and permissions (Offline Mode)
           </CardDescription>
         </CardHeader>
       </Card>
@@ -299,7 +267,6 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead className="font-semibold">Name</TableHead>
-                    <TableHead className="font-semibold">Email</TableHead>
                     <TableHead className="font-semibold">Role</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
                     <TableHead className="font-semibold">Registered</TableHead>
@@ -308,7 +275,7 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
                 </TableHeader>
                 <TableBody>
                   {teamMembers.map((member) => {
-                    const isRegistered = registeredEmails.includes(member.email);
+                    const isRegistered = registeredEmails.includes(member.email?.toLowerCase() || '');
                     
                     return (
                       <TableRow key={member.id} className={!member.is_active ? "bg-muted/30 opacity-60" : "bg-card"}>
@@ -319,9 +286,6 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
                             </div>
                             <span className="font-medium">{member.name}</span>
                           </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {member.email}
                         </TableCell>
                         <TableCell>
                           {member.is_hod ? (
@@ -384,7 +348,6 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
                                   <AlertDialogTitle>Delete Team Member?</AlertDialogTitle>
                                   <AlertDialogDescription>
                                     This will permanently remove <strong>{member.name}</strong> from the team.
-                                    {isRegistered && " Their account will remain but they won't appear in team lists."}
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -458,110 +421,6 @@ export function HODAdminPanel({ currentUserId }: HODAdminPanelProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Registered Users Section */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
-            <UserCheck className="h-4 w-4" />
-            Registered Accounts ({userRoles.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {userRoles.length === 0 ? (
-            <div className="text-center py-4 text-muted-foreground">
-              No users have registered yet.
-            </div>
-          ) : (
-            <div className="rounded-lg border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="font-semibold">User</TableHead>
-                    <TableHead className="font-semibold">System Role</TableHead>
-                    <TableHead className="text-right font-semibold">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {userRoles.map((userRole) => {
-                    const isCurrentUser = userRole.user_id === currentUserId;
-                    const displayName = userRole.user_email.split('@')[0];
-                    
-                    return (
-                      <TableRow key={userRole.id} className="bg-card">
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium uppercase">
-                              {displayName.charAt(0)}
-                            </div>
-                            <div>
-                              <div className="font-medium capitalize">{displayName}</div>
-                              <div className="text-xs text-muted-foreground">{userRole.user_email}</div>
-                            </div>
-                            {isCurrentUser && (
-                              <Badge variant="outline" className="text-xs">You</Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {editingUser === userRole.user_id ? (
-                            <Select
-                              value={selectedRole}
-                              onValueChange={(value: AppRole) => setSelectedRole(value)}
-                            >
-                              <SelectTrigger className="w-[140px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="hod">HOD</SelectItem>
-                                <SelectItem value="team_member">Team Member</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            getRoleBadge(userRole.role)
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {editingUser === userRole.user_id ? (
-                            <div className="flex gap-2 justify-end">
-                              <Button
-                                size="sm"
-                                onClick={() => handleRoleChange(userRole.user_id)}
-                              >
-                                Save
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setEditingUser(null)}
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setEditingUser(userRole.user_id);
-                                setSelectedRole(userRole.role);
-                              }}
-                              disabled={isCurrentUser}
-                              title="Change system role"
-                            >
-                              <Crown className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
