@@ -94,7 +94,7 @@ const Index = () => {
           activeView={activeView}
           onViewChange={setActiveView}
           userEmail={user?.email}
-          currentUser={user?.name || user?.email?.split('@')[0] || ''}
+          currentUser={user?.email?.split('@')[0]?.charAt(0).toUpperCase() + (user?.email?.split('@')[0]?.slice(1) || '')}
           onSignOut={handleSignOut}
           isHOD={currentUserIsHOD}
         />

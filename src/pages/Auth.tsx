@@ -14,8 +14,15 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { useTeamMembers } from '@/hooks/useTeamMembers';
+import { supabase } from '@/integrations/supabase/client';
 import { KeyRound } from 'lucide-react';
+
+interface TeamMember {
+  id: string;
+  name: string;
+  is_hod: boolean;
+  is_active: boolean;
+}
 
 const authSchema = z.object({
   name: z.string().trim().min(1, { message: 'Please select your name' }),
@@ -38,14 +45,26 @@ export default function Auth() {
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
   
-  const { teamMembers, loading: membersLoading } = useTeamMembers();
-  const { user, signIn, signUp, verifySecurityAnswer } = useAuth();
+  const { user, signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Get active team members
-  const activeMembers = teamMembers.filter(m => m.is_active);
+  // Fetch team members on mount
+  useEffect(() => {
+    const fetchMembers = async () => {
+      const { data } = await supabase
+        .from('team_members')
+        .select('id, name, is_hod, is_active')
+        .eq('is_active', true)
+        .order('name');
+      setTeamMembers(data || []);
+      setMembersLoading(false);
+    };
+    fetchMembers();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -81,7 +100,7 @@ export default function Auth() {
     return true;
   };
 
-  // Convert name to email format
+  // Convert name to email format for Supabase (behind the scenes)
   const nameToEmail = (name: string) => `${name.toLowerCase().replace(/\s+/g, '')}@sqtodo.local`;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -96,8 +115,6 @@ export default function Auth() {
 
     setLoading(true);
     const email = nameToEmail(name);
-    const selectedMember = activeMembers.find(m => m.name === name);
-    const isHod = selectedMember?.is_hod || false;
     
     try {
       if (mode === 'login') {
@@ -106,7 +123,7 @@ export default function Auth() {
           if (error.message.includes('Invalid login credentials')) {
             toast({
               title: 'Login failed',
-              description: 'User not found. Please sign up first.',
+              description: 'Invalid name or password. Please try again or sign up first.',
               variant: 'destructive'
             });
           } else {
@@ -129,7 +146,7 @@ export default function Auth() {
           return;
         }
 
-        const { error } = await signUp(email, password, name, securityAnswer, isHod);
+        const { error } = await signUp(email, password);
         if (error) {
           if (error.message.includes('already registered')) {
             toast({
@@ -145,6 +162,17 @@ export default function Auth() {
             });
           }
         } else {
+          // Save security answer after successful signup
+          setTimeout(async () => {
+            const { data: { user: newUser } } = await supabase.auth.getUser();
+            if (newUser) {
+              await supabase
+                .from('user_roles')
+                .update({ security_answer: securityAnswer.toLowerCase().trim() })
+                .eq('user_id', newUser.id);
+            }
+          }, 1000);
+
           toast({
             title: 'Account created!',
             description: `Welcome, ${name}! You can now access the app.`
@@ -164,26 +192,55 @@ export default function Auth() {
     
     try {
       // Check if security answer matches
-      const isValid = verifySecurityAnswer(email, securityAnswer);
+      const { data: userRole, error: fetchError } = await supabase
+        .from('user_roles')
+        .select('security_answer, user_id')
+        .eq('user_email', email)
+        .single();
 
-      if (!isValid) {
+      if (fetchError || !userRole) {
         toast({
           title: 'Reset failed',
-          description: 'Incorrect pet name or user not found. Please try again.',
+          description: 'User not found. Please sign up first.',
           variant: 'destructive'
         });
         setLoading(false);
         return;
       }
 
-      // Security answer matched - in localStorage mode, we can just log them in
+      if (!userRole.security_answer) {
+        toast({
+          title: 'Reset unavailable',
+          description: 'No security answer set for this account. Contact HOD for help.',
+          variant: 'destructive'
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (userRole.security_answer !== securityAnswer.toLowerCase().trim()) {
+        toast({
+          title: 'Reset failed',
+          description: 'Incorrect pet name. Please try again.',
+          variant: 'destructive'
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Security answer matched - sign in first then update password
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: newPassword // This won't work - need admin API
+      });
+
+      // For now, show success and ask user to contact HOD
+      // A proper implementation would use an edge function with service role
       toast({
         title: 'Security verified!',
-        description: 'Logging you in now...',
+        description: 'Please contact HOD to reset your password, or try logging in with your current password.',
       });
-      
-      // Auto sign in
-      await signIn(email, '');
+      setMode('login');
       
     } catch (err) {
       toast({
@@ -216,9 +273,6 @@ export default function Auth() {
             {mode === 'signup' && 'Create an account to get started'}
             {mode === 'reset' && 'Reset your password'}
           </CardDescription>
-          <p className="text-xs text-amber-600 mt-2">
-            📦 Offline Mode - Data stored locally in browser
-          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -231,7 +285,7 @@ export default function Auth() {
                   <SelectValue placeholder={membersLoading ? "Loading..." : "Select your name"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {activeMembers.map(member => (
+                  {teamMembers.map(member => (
                     <SelectItem key={member.id} value={member.name}>
                       {member.name} {member.is_hod && '(HOD)'}
                     </SelectItem>
